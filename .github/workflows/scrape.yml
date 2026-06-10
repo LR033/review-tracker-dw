@@ -32,6 +32,7 @@ jobs:
           CI: "true"
         run: |
           python scrapers/freetour_scraper.py
+          python scrapers/guruwalk_scraper.py
 
       - name: Commit and push new reviews
         run: |

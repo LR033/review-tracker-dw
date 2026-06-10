@@ -8,7 +8,7 @@ reviews from 6 platforms into a single CSV and visualizes them in Streamlit.
 | Platform     | Scraper                          | Status          |
 | ------------ | -------------------------------- | --------------- |
 | Freetour.com | `scrapers/freetour_scraper.py`   | ✅ Implemented  |
-| GuruWalk     | `scrapers/guruwalk_scraper.py`   | 🔲 Stub         |
+| GuruWalk     | `scrapers/guruwalk_scraper.py`   | ✅ Implemented  |
 | TripAdvisor  | `scrapers/tripadvisor_scraper.py`| 🔲 Stub         |
 | GetYourGuide | `scrapers/getyourguide_scraper.py`| 🔲 Stub        |
 | Viator       | `scrapers/viator_scraper.py`     | 🔲 Stub         |

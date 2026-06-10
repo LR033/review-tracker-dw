@@ -23,11 +23,17 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
 
 ## Status (2026-06-10)
 
-- ✅ `freetour_scraper.py` implemented. Listing-page selectors are proven
-  (taken from the rankings tracker, see below). **Review-block selectors on
-  tour pages are unverified candidates** — the script tries several and
-  prints which matched; expect to refine them after the first real run.
-- 🔲 All other scrapers + dashboard are docstring stubs. Each stub's
+- ✅ `freetour_scraper.py` implemented and verified against the live site.
+  Selectors documented in its docstring. Ratings are /10 on the site,
+  stored as /5. Only the ~10 most recent reviews per tour are exposed
+  without pagination (Marais alone has 334 total — historical backlog
+  needs a pagination step if ever wanted).
+- ✅ `guruwalk_scraper.py` implemented and verified. Targets **Charing
+  Cross Tours** (the company's GuruWalk brand). Review carousel exposes
+  only ~5 most recent reviews per tour; dates are month-granularity
+  (stored as YYYY-MM); rating from star-SVG path shapes. Selectors
+  documented in its docstring.
+- 🔲 Remaining scrapers + dashboard are docstring stubs. Each stub's
   docstring records platform-specific gotchas (bot protection, lazy
   loading, consent walls).
 
