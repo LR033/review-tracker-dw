@@ -1,0 +1,47 @@
+# Daily review scrape for Discover Walks.
+# Runs only the implemented scrapers; add new ones to the "Run scrapers"
+# step as they come online.
+name: Daily review scrape
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # 10:00 Paris (CEST) / 09:00 (CET)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Run scrapers
+        env:
+          CI: "true"
+        run: |
+          python scrapers/freetour_scraper.py
+
+      - name: Commit and push new reviews
+        run: |
+          git config user.name "DW Review Tracker"
+          git config user.email "actions@github.com"
+          git add data/reviews.csv
+          if git diff --cached --quiet; then
+            echo "No new reviews."
+          else
+            git commit -m "reviews: $(date -u +%F)"
+            git pull --rebase origin main
+            git push origin main
+          fi
