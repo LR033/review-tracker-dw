@@ -46,8 +46,10 @@ Limitations:
   anonymous reviewers from the same country reviewing the same tour on the same
   day collide (same class of caveat as guruwalk's month-granularity dates).
   Rare in practice -- ~1.4% of rows on the first full run.
-- Pages are scraped in fr-FR (project convention), so tour_name is the French
-  title -- stable as long as the locale is pinned.
+- Pages are scraped in en-US so tour_name is the English title (the dashboard
+  is English-facing). The reviews themselves stay in each reviewer's original
+  language. tour_name is stable as long as the locale is pinned -- changing the
+  locale changes the titles and will create new dedup keys.
 
 Run standalone:
     python scrapers/getyourguide_scraper.py
@@ -141,8 +143,8 @@ def _seed_body(activity_id: int) -> dict:
             "activityId": activity_id,
             "templateName": "ActivityDetails",
             "contentIdentifier": "paginated-reviews-with-filters",
-            "additionalDetailsSelectedLanguage": "fr-FR",
-            "participantsLanguage": "fr-FR",
+            "additionalDetailsSelectedLanguage": "en-US",
+            "participantsLanguage": "en-US",
             "hasButtonBeenClickedWithValidForm": False,
             "reviewsExperiments": [],
         },
@@ -257,16 +259,25 @@ async def scrape() -> list:
     forward_headers: dict = {}
 
     async def on_request(req):
-        # Refresh the forwardable header set from each blocks POST the page makes.
-        if "activity-details-page/blocks" in req.url and req.method == "POST":
-            try:
-                hdrs = await req.all_headers()
-            except Exception:
-                return
-            forward_headers.clear()
-            for k, v in hdrs.items():
-                if k.lower() not in _SKIP_HEADERS and not k.startswith(":"):
-                    forward_headers[k] = v
+        # Capture the forwardable header set from the FIRST blocks POST the
+        # page's app fires, then stop. Capturing once (not refreshing on every
+        # POST) is load-bearing: later app POSTs -- and the scraper's own
+        # in-page pagination fetches -- carry a thinner header set that makes
+        # the reviews endpoint ignore the offset and only return the ~10
+        # highlighted reviews, cutting deep pagination short. The headers we
+        # need (visitor-id, visitor-platform, x-gyg-*) are session-global, so
+        # the first capture is valid for every activity.
+        if "activity-details-page/blocks" not in req.url or req.method != "POST":
+            return
+        if forward_headers:
+            return
+        try:
+            hdrs = await req.all_headers()
+        except Exception:
+            return
+        for k, v in hdrs.items():
+            if k.lower() not in _SKIP_HEADERS and not k.startswith(":"):
+                forward_headers[k] = v
 
     async with async_playwright() as pw:
         # Headed real Chrome is required: Cloudflare 403s every headless
@@ -279,8 +290,8 @@ async def scrape() -> list:
         context = await browser.new_context(
             geolocation={"latitude": PARIS_LAT, "longitude": PARIS_LON},
             permissions=["geolocation"],
-            locale="fr-FR",
-            extra_http_headers={"Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8"},
+            locale="en-US",
+            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
         )
         page = await context.new_page()
         page.on("request", lambda r: asyncio.ensure_future(on_request(r)))

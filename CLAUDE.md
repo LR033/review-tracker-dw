@@ -46,12 +46,17 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   newest ~300; smaller tours come back complete. **Requires headed real
   Chrome** (Cloudflare 403s every headless variant) — so it canNOT run in CI;
   run it from a desktop. Endpoint shape + caveats in its docstring.
-  - ⚠️ **Known issue — French tour names.** The scraper runs with locale
-    `fr-FR`, so GYG returns French `tour_name`s (e.g. "Paris : le Marais sans
-    la foule"), which then show in the dashboard. To get English tour names,
-    re-run the scraper with locale `en-US` (in its `new_context(...)` call).
-    This is a scraper/data fix, not a dashboard concern — the dashboard
-    renders whatever names are in `data/reviews.csv`.
+  - Tour names are **English**: the scraper runs with locale `en-US` (locale +
+    Accept-Language + the blocks payload's `*Language` fields), since the
+    dashboard is English-facing. The reviews themselves stay in each reviewer's
+    original language. Changing the locale changes the titles — and therefore
+    the dedup keys — so keep it pinned at `en-US`.
+  - **Header capture is once-only.** `on_request` grabs the forwardable header
+    set from the *first* blocks POST the page fires and then stops. Refreshing
+    it on later POSTs (incl. the scraper's own pagination fetches) picks up a
+    thinner header set that makes the reviews endpoint ignore the offset and
+    return only the ~10 highlighted reviews — which silently truncates deep
+    pagination (10/tour instead of ~300).
 - ⛔ `tripadvisor_scraper.py` — recon on 2026-06-10 hit a hard block
   (403 + empty body, headless AND headed, stealth args insufficient;
   DataDome tier). See the stub docstring for options (owner export from
