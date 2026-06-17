@@ -17,7 +17,12 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   Each inserts its own dir into `sys.path` so `import base_scraper` works.
 - `data/reviews.csv` — append-only. Schema: platform, tour_name, rating,
   reviewer_name, review_text, review_date, url, scraped_at.
-- `dashboard/app.py` — Streamlit (stub).
+- `data/responses.csv` — written by the dashboard when a review is marked
+  "responded". Schema: platform, tour_name, reviewer_name, review_date,
+  responded_at. Keyed on the same `(platform, tour_name, reviewer_name,
+  review_date)` tuple the scrapers dedup on. Path is overridable via the
+  `DW_RESPONSES_CSV` env var (used by the dashboard tests).
+- `dashboard/app.py` — Streamlit dashboard (3 tabs; see Status).
 - `.github/workflows/scrape.yml` — daily cron; only runs implemented
   scrapers; add new ones to its "Run scrapers" step.
 
@@ -33,13 +38,47 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   only ~5 most recent reviews per tour; dates are month-granularity
   (stored as YYYY-MM); rating from star-SVG path shapes. Selectors
   documented in its docstring.
-- 🔲 Remaining scrapers + dashboard are docstring stubs. Each stub's
-  docstring records platform-specific gotchas (bot protection, lazy
-  loading, consent walls).
+- ✅ `getyourguide_scraper.py` implemented and verified. Enumerates the 8
+  Discover Walks activities from the supplier page (`/discover-walks-s2584/`),
+  then drives GYG's own `activity-details-page/blocks` endpoint via an in-page
+  `fetch` to paginate the full review history (newest-first). Server caps
+  pagination at offset 300, so the two big tours (Marais/Montmartre) yield the
+  newest ~300; smaller tours come back complete. **Requires headed real
+  Chrome** (Cloudflare 403s every headless variant) — so it canNOT run in CI;
+  run it from a desktop. Endpoint shape + caveats in its docstring.
+- ⛔ `tripadvisor_scraper.py` — recon on 2026-06-10 hit a hard block
+  (403 + empty body, headless AND headed, stealth args insufficient;
+  DataDome tier). See the stub docstring for options (owner export from
+  TA Management Center is the recommended path).
+- ✅ `dashboard/app.py` implemented. Streamlit, dark theme + Plotly
+  (matches `~/freetour-tracker/dashboard.py` style; theme in
+  `.streamlit/config.toml`). Three tabs:
+  - **Reviews** — quick period buttons (7d/30d/90d/1y/All), sort selector
+    (newest / lowest / highest), and the feed. Each card can be marked
+    "responded" (persisted to `data/responses.csv`); responded reviews get a
+    green badge, unresponded 1–2★ reviews a red "needs reply" badge. Keeps
+    the per-review "Draft reply with Claude" button.
+  - **Analytics** — period-over-period KPI cards (this period vs the previous
+    equal window), a volume + avg-rating chart with weekly/monthly/yearly
+    toggle, per-platform and rating-distribution charts, and an "Analyze with
+    Claude" section (general + per-tour) that *streams* a themes/complaints/
+    praised-guides/trends summary and caches it in session_state.
+  - **Health** — auto-generated alerts panel + per-tour health table (last
+    30 days: count, avg, trend vs prior 30d, low-review count, response rate,
+    and a 🟢 ≥4.8 / 🟡 4.5–4.7 / 🔴 <4.5 status).
+  Filters: platform + tour are global; the star-rating slider scopes the
+  Reviews feed only. Both Claude features use `claude-sonnet-4-6` with the key
+  from `st.secrets["ANTHROPIC_API_KEY"]`, and degrade gracefully (disabled
+  with a hint) when it's absent. Run: `streamlit run dashboard/app.py`.
+- 🔲 Remaining scrapers are docstring stubs. Each stub's docstring records
+  platform-specific gotchas (bot protection, lazy loading, consent walls).
 
 ## Conventions
 
-- Python, async Playwright, pandas. No paid APIs (hard constraint).
+- Python, async Playwright, pandas. No paid APIs for *review collection*
+  (hard constraint) — scrapers must never depend on a paid aggregator. The
+  dashboard's optional Claude reply-drafting is the one deliberate paid-API
+  exception (user-requested, key-gated, off by default).
 - Headless Chromium with Paris geolocation + fr-FR locale (matches what the
   rankings tracker does; keeps results consistent with what Paris users see).
 - Print progress to stdout (these run in cron/CI; logs are the only trace).
