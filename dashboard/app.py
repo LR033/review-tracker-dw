@@ -77,8 +77,7 @@ company known for warm, knowledgeable local guides. You draft public replies \
 to customer reviews.
 
 Guidelines:
-- Write in the SAME LANGUAGE as the review (French review -> French reply, \
-English -> English, etc.).
+- Always write your reply in English, regardless of the review's language.
 - Tone: friendly, warm, and professional -- never stiff or corporate, never \
 sycophantic or over-apologetic.
 - Thank the reviewer by first name if one is given, and reference something \
@@ -380,6 +379,31 @@ st.markdown(
     .review-card.low .rc-stars { color: #ff6b6b; }
     .review-card .rc-tour { color: #9aa0a6; font-size: 12px; margin: 2px 0 6px; }
     .review-card .rc-text { color: #e8e8e8; font-size: 14px; line-height: 1.45; }
+
+    /* Tab navigation — st.button styled as real tabs (keys: tabbtn_0..n) */
+    div[class*="st-key-tabbtn_"] button {
+        border: 1px solid #2a2f3a;
+        border-bottom: 3px solid transparent;
+        border-radius: 10px 10px 0 0;
+        background: #161922;
+        color: #9aa0a6;
+        font-size: 16px;
+        font-weight: 600;
+        padding: 12px 4px;
+        transition: none;
+    }
+    div[class*="st-key-tabbtn_"] button:hover {
+        background: #1c2029; color: #d6d9de;
+    }
+    /* Active tab (rendered as a primary button) */
+    div[class*="st-key-tabbtn_"] button[kind="primary"],
+    div[class*="st-key-tabbtn_"] button[data-testid="stBaseButton-primary"] {
+        background: #1f2430 !important;
+        color: #ffffff !important;
+        border-color: #2a2f3a !important;
+        border-bottom: 3px solid #E63946 !important;
+        font-size: 18px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -443,12 +467,25 @@ if bdf.empty:
     st.stop()
 
 # st.tabs() has no API to set the active tab, so it snaps back to the first tab
-# on every rerun (e.g. when a widget inside Analytics/Health changes). A radio
-# backed by session_state (via its key) remembers the active tab across reruns.
+# on every rerun. We render our own tab bar from st.button (one per tab) and
+# keep the active tab in session_state, so the selection persists across reruns.
+# The active tab is drawn as a primary button and styled distinctly via CSS.
 TAB_LABELS = ["📋 Reviews", "📊 Analytics", "🩺 Health"]
-active_tab = st.radio(
-    "View", TAB_LABELS, horizontal=True, key="active_tab", label_visibility="collapsed"
-)
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = TAB_LABELS[0]
+
+nav_cols = st.columns(len(TAB_LABELS))
+for i, label in enumerate(TAB_LABELS):
+    is_active = st.session_state.active_tab == label
+    if nav_cols[i].button(
+        label,
+        key=f"tabbtn_{i}",
+        type="primary" if is_active else "secondary",
+        width="stretch",
+    ) and not is_active:
+        st.session_state.active_tab = label
+        st.rerun()
+active_tab = st.session_state.active_tab
 st.divider()
 
 # ===========================================================================
