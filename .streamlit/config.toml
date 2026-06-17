@@ -1,0 +1,9 @@
+# Dark theme for the Discover Walks review dashboard.
+# Mirrors the freetour-tracker dashboard's look (dark background, plotly charts).
+[theme]
+base = "dark"
+primaryColor = "#E63946"
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#1a1d24"
+textColor = "#e8e8e8"
+font = "sans serif"
