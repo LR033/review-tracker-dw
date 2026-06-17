@@ -392,6 +392,10 @@ DARK = dict(
     margin=dict(l=0, r=10, t=30, b=0),
 )
 
+# Plotly.js options for st.plotly_chart(..., config=...). Charts default to
+# container width (use_container_width=True), so no width kwarg is needed.
+PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
+
 df = load_reviews()
 responded = load_responses()
 
@@ -438,13 +442,20 @@ if bdf.empty:
     st.info("No reviews match the selected platforms/tours.")
     st.stop()
 
-tab_reviews, tab_analytics, tab_health = st.tabs(["📋 Reviews", "📊 Analytics", "🩺 Health"])
+# st.tabs() has no API to set the active tab, so it snaps back to the first tab
+# on every rerun (e.g. when a widget inside Analytics/Health changes). A radio
+# backed by session_state (via its key) remembers the active tab across reruns.
+TAB_LABELS = ["📋 Reviews", "📊 Analytics", "🩺 Health"]
+active_tab = st.radio(
+    "View", TAB_LABELS, horizontal=True, key="active_tab", label_visibility="collapsed"
+)
+st.divider()
 
 # ===========================================================================
 # TAB 1 — REVIEWS
 # ===========================================================================
 
-with tab_reviews:
+if active_tab == "📋 Reviews":
     PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "All": None}
 
     c1, c2 = st.columns([2, 1])
@@ -537,7 +548,7 @@ with tab_reviews:
 # TAB 2 — ANALYTICS
 # ===========================================================================
 
-with tab_analytics:
+elif active_tab == "📊 Analytics":
     AN_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
     an_period = st.radio(
         "Comparison period", list(AN_PERIODS), index=1, horizontal=True, key="an_period"
@@ -611,7 +622,7 @@ with tab_analytics:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         **DARK,
     )
-    st.plotly_chart(fig_t, width="stretch")
+    st.plotly_chart(fig_t, config=PLOTLY_CONFIG)
 
     cc1, cc2 = st.columns(2)
     with cc1:
@@ -633,7 +644,7 @@ with tab_analytics:
             hovertemplate="<b>%{y}</b><br>Avg %{x:.2f}<extra></extra>",
         ))
         fig_p.update_layout(height=300, xaxis=dict(range=[0, 5.4], title="Average rating"), **DARK)
-        st.plotly_chart(fig_p, width="stretch")
+        st.plotly_chart(fig_p, config=PLOTLY_CONFIG)
 
     with cc2:
         st.subheader("Rating distribution")
@@ -643,7 +654,7 @@ with tab_analytics:
             hovertemplate="%{x}★ — %{y} reviews<extra></extra>",
         ))
         fig_h.update_layout(height=300, xaxis=dict(title="Rating"), yaxis=dict(title="Reviews"), **DARK)
-        st.plotly_chart(fig_h, width="stretch")
+        st.plotly_chart(fig_h, config=PLOTLY_CONFIG)
 
     st.divider()
 
@@ -697,7 +708,7 @@ with tab_analytics:
 # TAB 3 — HEALTH
 # ===========================================================================
 
-with tab_health:
+else:  # 🩺 Health
     DROP_THRESHOLD = 0.2  # min avg-rating drop (vs prev 30d) to raise an alert
 
     # Build per-tour stats over the last 30 days (vs the prior 30 days).
