@@ -1,9 +1,8 @@
-# Dark theme for the Discover Walks review dashboard.
-# Mirrors the freetour-tracker dashboard's look (dark background, plotly charts).
+# Theme for the Discover Walks review dashboard.
+# No `base` is set, so Streamlit follows the viewer's system light/dark
+# preference. Only the accent colour is pinned — to a neutral slate-blue
+# (less visually aggressive than the previous red) so filter chips, the
+# slider, and primary buttons read as calm/neutral in both modes.
 [theme]
-base = "dark"
-primaryColor = "#E63946"
-backgroundColor = "#0e1117"
-secondaryBackgroundColor = "#1a1d24"
-textColor = "#e8e8e8"
+primaryColor = "#5B7A99"
 font = "sans serif"

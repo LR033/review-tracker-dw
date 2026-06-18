@@ -2,15 +2,15 @@
 Streamlit review dashboard for Discover Walks (Paris tour company).
 
 Loads data/reviews.csv (the append-only scraper output) and presents it across
-three tabs, with a dark theme and Plotly charts matching the rankings dashboard
-(~/freetour-tracker/dashboard.py):
+three tabs. The theme follows the viewer's system light/dark preference
+(neutral, translucent card colours; charts themed via st.plotly_chart):
 
   Tab 1 — Reviews
-    Quick period buttons (7d/30d/90d/1y/All), a sort selector
-    (newest / lowest / highest), and the per-review feed. Each card can be
-    marked "responded" (persisted to data/responses.csv); responded reviews
-    get a green badge, unresponded 1-2★ reviews a red "needs reply" badge.
-    Every card keeps the "Draft reply with Claude" button.
+    Quick period buttons (default 7d), a sort selector (newest / lowest /
+    highest), and the per-review feed. Empty reviews show "(no comment)".
+    Each card can be marked "responded" (persisted to data/responses.csv);
+    responded reviews get a green badge, unresponded 1-2★ reviews a red
+    "needs reply" badge. Every card keeps a compact "Draft reply" button.
 
   Tab 2 — Analytics
     Period-over-period KPI cards (this period vs the previous equal window),
@@ -20,9 +20,10 @@ three tabs, with a dark theme and Plotly charts matching the rankings dashboard
     praised guides, and trends.
 
   Tab 3 — Health
-    An auto-generated alerts panel and a per-tour health table (last 30 days):
-    review count, avg rating, trend vs the previous 30 days, low-review count,
-    response rate, and a 🟢/🟡/🔴 status from the last-30-day average.
+    A period selector (default 7d) driving an auto-generated alerts panel and a
+    per-tour health table: review count, avg rating, trend vs the previous
+    equal period, a "Below 5★" count (any review under 5 stars), response rate,
+    and a 🟢/🟡/🔴 status from the period average.
 
 Filters: platform and tour apply globally; the star-rating filter scopes the
 Reviews feed only (so Analytics/Health averages and statuses stay accurate).
@@ -297,10 +298,15 @@ def stars(rating: float) -> str:
     return "★" * full + ("½" if half else "") + "☆" * (5 - full - (1 if half else 0))
 
 
+# Neutral slate-blue for all platform badges (change 7): calm and uniform
+# rather than the previous per-platform colours (which included an aggressive
+# red). The platform name still identifies the source.
+BADGE_SLATE = "#5B7A99"
+
+
 def platform_badge(platform: str, label: str) -> str:
-    color = PLATFORMS.get(platform, {}).get("color", "#888")
     return (
-        f'<span style="background:{color};color:#fff;border-radius:6px;'
+        f'<span style="background:{BADGE_SLATE};color:#fff;border-radius:6px;'
         f'padding:2px 9px;font-size:11px;font-weight:600;letter-spacing:.3px;">{label}</span>'
     )
 
@@ -313,7 +319,7 @@ def _pill(text: str, bg: str) -> str:
 
 
 def health_status(avg: float, n: int) -> tuple:
-    """(emoji, label) from last-30-day average rating."""
+    """(emoji, label) from the selected-period average rating."""
     if n == 0 or pd.isna(avg):
         return "⚪", "No recent data"
     if avg >= 4.8:
@@ -361,60 +367,66 @@ st.set_page_config(page_title="Discover Walks — Reviews", page_icon="🗼", la
 st.markdown(
     """
     <style>
+    /* Neutral, translucent colours so cards work in both light and dark mode.
+       Text colour is inherited from Streamlit's theme (we only tune opacity),
+       so nothing is hardcoded to a single mode. */
     .kpi {
-        background: #1a1d24; border-radius: 12px; padding: 16px 20px;
+        background: rgba(128,128,128,0.10); border-radius: 12px; padding: 16px 20px;
         border-left: 5px solid; min-height: 100px;
     }
-    .kpi .kpi-label { font-size: 12px; color: #9aa0a6; margin-bottom: 6px; }
-    .kpi .kpi-value { font-size: 30px; font-weight: 700; line-height: 1; color: #f1f1f1; }
-    .kpi .kpi-sub   { font-size: 11px; color: #9aa0a6; margin-top: 8px; }
+    .kpi .kpi-label { font-size: 12px; opacity: 0.65; margin-bottom: 6px; }
+    .kpi .kpi-value { font-size: 30px; font-weight: 700; line-height: 1; }
+    .kpi .kpi-sub   { font-size: 11px; opacity: 0.65; margin-top: 8px; }
 
     .review-card {
-        background: #1a1d24; border-radius: 12px; padding: 14px 18px;
+        background: rgba(128,128,128,0.10); border-radius: 12px; padding: 14px 18px;
         margin-bottom: 4px; border-left: 4px solid #2A9D8F;
     }
-    .review-card.low { border-left-color: #E63946; background: #2a1416; }
-    .review-card .rc-head { font-size: 13px; color: #c8ccd0; margin-bottom: 4px; }
-    .review-card .rc-stars { font-size: 15px; color: #E9C46A; }
-    .review-card.low .rc-stars { color: #ff6b6b; }
-    .review-card .rc-tour { color: #9aa0a6; font-size: 12px; margin: 2px 0 6px; }
-    .review-card .rc-text { color: #e8e8e8; font-size: 14px; line-height: 1.45; }
+    .review-card.low { border-left-color: #E63946; background: rgba(230,57,70,0.10); }
+    .review-card .rc-head { font-size: 13px; opacity: 0.9; margin-bottom: 4px; }
+    .review-card .rc-stars { font-size: 15px; color: #E0A030; }
+    .review-card.low .rc-stars { color: #E63946; }
+    .review-card .rc-tour { opacity: 0.6; font-size: 12px; margin: 2px 0 6px; }
+    .review-card .rc-text { font-size: 16px; line-height: 1.45; }
 
-    /* Tab navigation — st.button styled as real tabs (keys: tabbtn_0..n) */
+    /* Tab navigation — st.button styled as real tabs (keys: tabbtn_0..n).
+       Translucent neutrals + inherited text colour adapt to light/dark. */
     div[class*="st-key-tabbtn_"] button {
-        border: 1px solid #2a2f3a;
+        border: 1px solid rgba(128,128,128,0.30);
         border-bottom: 3px solid transparent;
         border-radius: 10px 10px 0 0;
-        background: #161922;
-        color: #9aa0a6;
+        background: rgba(128,128,128,0.08);
         font-size: 16px;
         font-weight: 600;
         padding: 12px 4px;
         transition: none;
     }
     div[class*="st-key-tabbtn_"] button:hover {
-        background: #1c2029; color: #d6d9de;
+        background: rgba(128,128,128,0.18);
     }
     /* Active tab (rendered as a primary button) */
     div[class*="st-key-tabbtn_"] button[kind="primary"],
     div[class*="st-key-tabbtn_"] button[data-testid="stBaseButton-primary"] {
-        background: #1f2430 !important;
-        color: #ffffff !important;
-        border-color: #2a2f3a !important;
-        border-bottom: 3px solid #E63946 !important;
+        background: rgba(128,128,128,0.18) !important;
+        border-color: rgba(128,128,128,0.30) !important;
+        border-bottom: 3px solid #5B7A99 !important;
         font-size: 18px;
+    }
+
+    /* Compact "Draft reply" buttons (keys: draftbtn_*) */
+    div[class*="st-key-draftbtn_"] button {
+        font-size: 12px;
+        padding: 1px 10px;
+        min-height: 0;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-DARK = dict(
-    template="plotly_dark",
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    margin=dict(l=0, r=10, t=30, b=0),
-)
+# No hardcoded template/background: st.plotly_chart(theme="streamlit") (the
+# default) themes the chart to match the active light/dark Streamlit theme.
+CHART_LAYOUT = dict(margin=dict(l=0, r=10, t=30, b=0))
 
 # Plotly.js options for st.plotly_chart(..., config=...). Charts default to
 # container width (use_container_width=True), so no width kwarg is needed.
@@ -444,12 +456,13 @@ sel_platforms = st.sidebar.multiselect(
     "Platform", options=platform_opts, default=platform_opts,
     format_func=lambda p: PLATFORMS.get(p, {}).get("label", p.title()),
 )
+# Deselecting everything means "all" (change 8), never an empty dashboard.
 if not sel_platforms:
     sel_platforms = platform_opts
 
 tour_opts = sorted(df[df["platform"].isin(sel_platforms)]["tour_name"].unique())
 sel_tours = st.sidebar.multiselect("Tour", options=tour_opts, default=tour_opts)
-if not sel_tours:
+if not sel_tours:  # same fallback for tours
     sel_tours = tour_opts
 
 min_rating, max_rating = st.sidebar.slider(
@@ -496,7 +509,7 @@ if active_tab == "📋 Reviews":
     PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "All": None}
 
     c1, c2 = st.columns([2, 1])
-    period = c1.radio("Period", list(PERIOD_DAYS), index=3, horizontal=True, key="rev_period")
+    period = c1.radio("Period", list(PERIOD_DAYS), index=0, horizontal=True, key="rev_period")
     sort_order = c2.selectbox(
         "Sort", ["Newest first", "Lowest rated", "Highest rated"], key="rev_sort"
     )
@@ -530,7 +543,7 @@ if active_tab == "📋 Reviews":
         is_resp = rkey in responded
         date_str = row["review_date"].strftime("%d %b %Y")
         name = row["reviewer_name"] or "Anonymous"
-        text = row["review_text"] or "<em>(rating only — no written review)</em>"
+        text = row["review_text"] or "<em>(no comment)</em>"
 
         badge = ""
         if is_resp:
@@ -560,11 +573,11 @@ if active_tab == "📋 Reviews":
             set_responded(row, checked)
             st.rerun()
 
-        # Draft reply with Claude.
+        # Draft reply with Claude (compact secondary button — styled small via
+        # the st-key-draftbtn_ CSS; no width="stretch" so it stays content-width).
         reply_key = f"reply_{idx}"
         if ctrl[1].button(
-            "✍️ Draft reply", key=f"btn_{idx}", disabled=client is None,
-            width="stretch",
+            "✍️ Draft reply", key=f"draftbtn_{idx}", disabled=client is None,
         ):
             with st.spinner("Drafting reply…"):
                 try:
@@ -588,7 +601,7 @@ if active_tab == "📋 Reviews":
 elif active_tab == "📊 Analytics":
     AN_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
     an_period = st.radio(
-        "Comparison period", list(AN_PERIODS), index=1, horizontal=True, key="an_period"
+        "Comparison period", list(AN_PERIODS), index=0, horizontal=True, key="an_period"
     )
     n_days = AN_PERIODS[an_period]
     cur = window(bdf, n_days, offset=0)
@@ -657,7 +670,7 @@ elif active_tab == "📊 Analytics":
         yaxis=dict(title="Reviews"),
         yaxis2=dict(title="Avg rating", overlaying="y", side="right", range=[0, 5.2]),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        **DARK,
+        **CHART_LAYOUT,
     )
     st.plotly_chart(fig_t, config=PLOTLY_CONFIG)
 
@@ -680,7 +693,7 @@ elif active_tab == "📊 Analytics":
             textposition="outside",
             hovertemplate="<b>%{y}</b><br>Avg %{x:.2f}<extra></extra>",
         ))
-        fig_p.update_layout(height=300, xaxis=dict(range=[0, 5.4], title="Average rating"), **DARK)
+        fig_p.update_layout(height=300, xaxis=dict(range=[0, 5.4], title="Average rating"), **CHART_LAYOUT)
         st.plotly_chart(fig_p, config=PLOTLY_CONFIG)
 
     with cc2:
@@ -690,7 +703,7 @@ elif active_tab == "📊 Analytics":
             x=dist.index.astype(str), y=dist.values, marker_color=PALETTE[4],
             hovertemplate="%{x}★ — %{y} reviews<extra></extra>",
         ))
-        fig_h.update_layout(height=300, xaxis=dict(title="Rating"), yaxis=dict(title="Reviews"), **DARK)
+        fig_h.update_layout(height=300, xaxis=dict(title="Rating"), yaxis=dict(title="Reviews"), **CHART_LAYOUT)
         st.plotly_chart(fig_h, config=PLOTLY_CONFIG)
 
     st.divider()
@@ -746,26 +759,34 @@ elif active_tab == "📊 Analytics":
 # ===========================================================================
 
 else:  # 🩺 Health
-    DROP_THRESHOLD = 0.2  # min avg-rating drop (vs prev 30d) to raise an alert
+    HEALTH_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "All": None}
+    h_period = st.radio(
+        "Period", list(HEALTH_PERIODS), index=0, horizontal=True, key="health_period"
+    )
+    h_days = HEALTH_PERIODS[h_period]
+    DROP_THRESHOLD = 0.2  # min avg-rating drop vs the previous equal period to alert
 
-    # Build per-tour stats over the last 30 days (vs the prior 30 days).
+    def _cur_prev(g):
+        """Current and previous equal-length windows for the selected period."""
+        if h_days is None:                       # "All" → no previous window
+            return g, g.iloc[0:0]
+        return window(g, h_days, 0), window(g, h_days, h_days)
+
+    # Build per-tour stats over the selected period (vs the prior equal period).
     rows = []
     alerts = []
     for (plat, tour), g in bdf.groupby(["platform", "tour_name"]):
-        last30 = window(g, 30, 0)
-        prev30 = window(g, 30, 30)
-        last7 = window(g, 7, 0)
-        n = len(last30)
+        cur, prev = _cur_prev(g)
+        n = len(cur)
         if n == 0:
-            continue  # "last 30 days" table → only active tours
+            continue  # only tours active in the selected period
 
-        avg = last30["rating"].mean()
-        prev_avg = prev30["rating"].mean() if len(prev30) else float("nan")
+        avg = cur["rating"].mean()
+        prev_avg = prev["rating"].mean() if len(prev) else float("nan")
         trend = (avg - prev_avg) if pd.notna(prev_avg) else None
-        low30 = int((last30["rating"] <= LOW_MAX).sum())
-        low7 = int((last7["rating"] <= LOW_MAX).sum())
-        responded_30 = sum(1 for _, r in last30.iterrows() if row_key(r) in responded)
-        resp_rate = responded_30 / n if n else 0.0
+        below5 = int((cur["rating"] < 5).sum())  # change 4: anything under 5★
+        responded_n = sum(1 for _, r in cur.iterrows() if row_key(r) in responded)
+        resp_rate = responded_n / n if n else 0.0
         emoji, label = health_status(avg, n)
         label_full = PLATFORMS.get(plat, {}).get("label", plat.title())
 
@@ -773,32 +794,35 @@ else:  # 🩺 Health
             "Status": f"{emoji} {label}",
             "Tour": tour,
             "Platform": label_full,
-            "Reviews (30d)": n,
-            "Avg (30d)": round(avg, 2),
+            "Reviews": n,
+            "Avg": round(avg, 2),
             "Trend": "—" if trend is None else f"{'▲' if trend >= 0 else '▼'} {abs(trend):.2f}",
-            "Low (1-2★)": low30,
+            "Below 5★": below5,
             "Response rate": f"{resp_rate*100:.0f}%",
             "_sev": 0 if emoji == "🔴" else 1 if emoji == "🟡" else 2,
             "_avg": avg,
         })
 
+        # Alerts reflect the selected period (change 3). "Low" = any review
+        # below 5★ (change 4); averages/status thresholds are unchanged.
         if avg < 4.5:
-            alerts.append(("🔴", f"**{tour}** ({label_full}): average {avg:.2f} over the last 30 days (below 4.5)."))
-        if low7 >= 2:
-            alerts.append(("🟡", f"**{tour}** ({label_full}): {low7} low reviews (1-2★) in the last 7 days."))
+            alerts.append(("🔴", f"**{tour}** ({label_full}): average {avg:.2f} over the selected period (below 4.5)."))
+        if below5 >= 1:
+            alerts.append(("🟡", f"**{tour}** ({label_full}): {below5} review(s) below 5★ in the selected period."))
         if trend is not None and trend <= -DROP_THRESHOLD:
-            alerts.append(("🟡", f"**{tour}** ({label_full}): rating down {abs(trend):.2f} vs the previous 30 days."))
+            alerts.append(("🟡", f"**{tour}** ({label_full}): rating down {abs(trend):.2f} vs the previous period."))
 
-    # SLA alert: low reviews (last 30d) with no logged response after >48h.
+    # SLA alert: unanswered 1-2★ reviews older than 48h, within the period.
     cutoff = TODAY - timedelta(days=2)
-    recent_low = bdf[(bdf["rating"] <= LOW_MAX) & (bdf["review_date"].dt.date <= cutoff)]
-    recent_low = recent_low[recent_low["review_date"].dt.date > (TODAY - timedelta(days=30))]
-    overdue = [r for _, r in recent_low.iterrows() if row_key(r) not in responded]
+    sla = bdf[(bdf["rating"] <= LOW_MAX) & (bdf["review_date"].dt.date <= cutoff)]
+    if h_days is not None:
+        sla = sla[sla["review_date"].dt.date > (TODAY - timedelta(days=h_days))]
+    overdue = [r for _, r in sla.iterrows() if row_key(r) not in responded]
     if overdue:
         alerts.append((
             "⚪",
-            f"{len(overdue)} low review(s) (1-2★) from the last 30 days have no logged "
-            f"response after 48h — see the Reviews tab.",
+            f"{len(overdue)} unanswered 1-2★ review(s) older than 48h in the selected "
+            f"period — see the Reviews tab.",
         ))
 
     st.subheader("Alerts")
@@ -809,13 +833,15 @@ else:  # 🩺 Health
         for level, msg in sorted(alerts, key=lambda a: order[a[0]]):
             {"🔴": st.error, "🟡": st.warning, "⚪": st.info}[level](f"{level} {msg}")
 
-    st.subheader("Tour health — last 30 days")
+    period_label = "all time" if h_days is None else f"last {h_period}"
+    st.subheader(f"Tour health — {period_label}")
     if not rows:
-        st.info("No reviews in the last 30 days for the selected platforms/tours.")
+        st.info("No reviews in the selected period for the selected platforms/tours.")
     else:
         hdf = pd.DataFrame(rows).sort_values(["_sev", "_avg"]).drop(columns=["_sev", "_avg"])
         st.dataframe(hdf, width="stretch", hide_index=True)
         st.caption(
-            "Status from last-30-day average: 🟢 4.8–5.0 · 🟡 4.5–4.7 · 🔴 below 4.5. "
-            "Trend compares the last 30 days with the previous 30."
+            "Status from the period average: 🟢 4.8–5.0 · 🟡 4.5–4.7 · 🔴 below 4.5. "
+            "“Below 5★” counts every review under 5 stars; trend compares against the "
+            "previous equal period."
         )
