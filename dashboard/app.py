@@ -2,15 +2,17 @@
 Streamlit review dashboard for Discover Walks (Paris tour company).
 
 Loads data/reviews.csv (the append-only scraper output) and presents it across
-three tabs. The theme follows the viewer's system light/dark preference
-(neutral, translucent card colours; charts themed via st.plotly_chart):
+three tabs. The theme follows the viewer's system light/dark preference, with a
+manual sidebar toggle to force light or dark (neutral, translucent card colours;
+charts themed via st.plotly_chart):
 
   Tab 1 — Reviews
     Quick period buttons (default 7d), a sort selector (newest / lowest /
     highest), and the per-review feed. Empty reviews show "(no comment)".
-    Each card can be marked "responded" (persisted to data/responses.csv);
-    responded reviews get a green badge, unresponded 1-2★ reviews a red
-    "needs reply" badge. Every card keeps a compact "Draft reply" button.
+    Reviews below 5★ are part of the response workflow: 1-3★ get a red "needs
+    reply" badge, 4★ a yellow "needs attention" badge, and any can be marked
+    "responded" (persisted to data/responses.csv → green badge). 5★ reviews
+    get no badge. Every card keeps a compact "Draft reply" button.
 
   Tab 2 — Analytics
     Period-over-period KPI cards (this period vs the previous equal window),
@@ -22,7 +24,7 @@ three tabs. The theme follows the viewer's system light/dark preference
   Tab 3 — Health
     A period selector (default 7d) driving an auto-generated alerts panel and a
     per-tour health table: review count, avg rating, trend vs the previous
-    equal period, a "Below 5★" count (any review under 5 stars), response rate,
+    equal period, a "Below 3★" count (reviews under 3 stars), response rate,
     and a 🟢/🟡/🔴 status from the period average.
 
 Filters: platform and tour apply globally; the star-rating filter scopes the
@@ -311,9 +313,9 @@ def platform_badge(platform: str, label: str) -> str:
     )
 
 
-def _pill(text: str, bg: str) -> str:
+def _pill(text: str, bg: str, fg: str = "#fff") -> str:
     return (
-        f'<span style="background:{bg};color:#fff;border-radius:6px;'
+        f'<span style="background:{bg};color:{fg};border-radius:6px;'
         f'padding:2px 8px;font-size:11px;font-weight:600;">{text}</span>'
     )
 
@@ -356,6 +358,28 @@ def kpi_card(col, label, value, delta_markup, color):
         f'<div class="kpi-sub">{delta_markup}</div></div>',
         unsafe_allow_html=True,
     )
+
+
+def theme_css(mode: str) -> str:
+    """CSS that forces a light or dark palette, overriding the system default.
+
+    Used by the manual sidebar toggle (change 3). Backgrounds are forced with
+    !important; the base text colour is set without !important so inline badge
+    colours still win. The translucent card colours adapt on their own.
+    """
+    if mode == "light":
+        bg, sidebar_bg, fg = "#ffffff", "#f3f4f6", "#1a1a1a"
+    else:
+        bg, sidebar_bg, fg = "#0e1117", "#1a1d24", "#e8e8e8"
+    return f"""
+    <style>
+    .stApp {{ background-color: {bg} !important; color: {fg}; }}
+    [data-testid="stHeader"] {{ background-color: {bg} !important; }}
+    [data-testid="stSidebar"] {{ background-color: {sidebar_bg} !important; }}
+    [data-testid="stAppViewContainer"] .stMarkdown,
+    [data-testid="stSidebar"] {{ color: {fg}; }}
+    </style>
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -419,10 +443,23 @@ st.markdown(
         padding: 1px 10px;
         min-height: 0;
     }
+
+    /* Narrower sidebar — ~75% of the default ~336px (change 5). */
+    [data-testid="stSidebar"] {
+        width: 252px !important;
+        min-width: 252px !important;
+        max-width: 252px !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+# Manual light/dark override (change 3). Default to dark; the sidebar toggle
+# flips st.session_state["theme_mode"] and the CSS below re-applies on rerun.
+if "theme_mode" not in st.session_state:
+    st.session_state.theme_mode = "dark"
+st.markdown(theme_css(st.session_state.theme_mode), unsafe_allow_html=True)
 
 # No hardcoded template/background: st.plotly_chart(theme="streamlit") (the
 # default) themes the chart to match the active light/dark Streamlit theme.
@@ -448,21 +485,32 @@ client, client_err = get_anthropic_client()
 # Sidebar filters (platform + tour are global; rating scopes the feed)
 # ---------------------------------------------------------------------------
 
+# Light/dark toggle (change 3): the button shows the mode it switches TO.
+_mode = st.session_state.theme_mode
+if st.sidebar.button(
+    "☀️ Light mode" if _mode == "dark" else "🌙 Dark mode",
+    key="theme_toggle", width="stretch",
+):
+    st.session_state.theme_mode = "light" if _mode == "dark" else "dark"
+    st.rerun()
+
 st.sidebar.header("Filters")
 
+# Empty selection shows an "All …" placeholder and is treated as all (change 4).
 platform_opts = [p for p in PLATFORMS if p in set(df["platform"])]
 platform_opts += [p for p in df["platform"].unique() if p not in platform_opts]
 sel_platforms = st.sidebar.multiselect(
-    "Platform", options=platform_opts, default=platform_opts,
+    "Platform", options=platform_opts, default=[], placeholder="All platforms",
     format_func=lambda p: PLATFORMS.get(p, {}).get("label", p.title()),
 )
-# Deselecting everything means "all" (change 8), never an empty dashboard.
 if not sel_platforms:
     sel_platforms = platform_opts
 
 tour_opts = sorted(df[df["platform"].isin(sel_platforms)]["tour_name"].unique())
-sel_tours = st.sidebar.multiselect("Tour", options=tour_opts, default=tour_opts)
-if not sel_tours:  # same fallback for tours
+sel_tours = st.sidebar.multiselect(
+    "Tour", options=tour_opts, default=[], placeholder="All tours",
+)
+if not sel_tours:
     sel_tours = tour_opts
 
 min_rating, max_rating = st.sidebar.slider(
@@ -538,23 +586,30 @@ if active_tab == "📋 Reviews":
         st.info("No reviews match the current filters and period.")
 
     for idx, row in feed.head(int(show_n)).iterrows():
-        is_low = pd.notna(row["rating"]) and row["rating"] <= LOW_MAX
+        rating = row["rating"]
+        below5 = pd.notna(rating) and rating < 5            # tracked for responses
+        needs_reply = pd.notna(rating) and rating <= 3      # 1-3★ urgent (red)
+        needs_attn = below5 and not needs_reply             # 3<r<5 → 4★ (yellow)
         rkey = row_key(row)
         is_resp = rkey in responded
         date_str = row["review_date"].strftime("%d %b %Y")
         name = row["reviewer_name"] or "Anonymous"
         text = row["review_text"] or "<em>(no comment)</em>"
 
+        # Three-tier badge (change 1). 5★ reviews get no badge and aren't part
+        # of the response-tracking workflow.
         badge = ""
-        if is_resp:
+        if below5 and is_resp:
             badge = " &nbsp;" + _pill("✓ Responded", "#2A9D8F")
-        elif is_low:
+        elif needs_reply:
             badge = " &nbsp;" + _pill("⚠ Needs reply", "#E63946")
+        elif needs_attn:
+            badge = " &nbsp;" + _pill("⚠ Needs attention", "#E9C46A", fg="#5a4500")
 
         st.markdown(
-            f'<div class="review-card {"low" if is_low else ""}">'
+            f'<div class="review-card {"low" if needs_reply else ""}">'
             f'<div class="rc-head">{platform_badge(row["platform"], row["platform_label"])} '
-            f'&nbsp;<span class="rc-stars">{stars(row["rating"])}</span> '
+            f'&nbsp;<span class="rc-stars">{stars(rating)}</span> '
             f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; {date_str}{badge}</div>'
             f'<div class="rc-tour">{row["tour_name"]}</div>'
             f'<div class="rc-text">{text}</div>'
@@ -564,14 +619,16 @@ if active_tab == "📋 Reviews":
 
         ctrl = st.columns([1, 1, 3])
 
-        # Mark-as-responded checkbox (persists to responses.csv).
-        cb_key = f"resp_{idx}"
-        if cb_key not in st.session_state:
-            st.session_state[cb_key] = is_resp
-        checked = ctrl[0].checkbox("✅ Mark as responded", key=cb_key)
-        if checked != is_resp:
-            set_responded(row, checked)
-            st.rerun()
+        # Mark-as-responded checkbox — tracked for all reviews below 5★
+        # (change 1); 5★ reviews don't need a response, so no checkbox.
+        if below5:
+            cb_key = f"resp_{idx}"
+            if cb_key not in st.session_state:
+                st.session_state[cb_key] = is_resp
+            checked = ctrl[0].checkbox("✅ Mark as responded", key=cb_key)
+            if checked != is_resp:
+                set_responded(row, checked)
+                st.rerun()
 
         # Draft reply with Claude (compact secondary button — styled small via
         # the st-key-draftbtn_ CSS; no width="stretch" so it stays content-width).
@@ -784,7 +841,7 @@ else:  # 🩺 Health
         avg = cur["rating"].mean()
         prev_avg = prev["rating"].mean() if len(prev) else float("nan")
         trend = (avg - prev_avg) if pd.notna(prev_avg) else None
-        below5 = int((cur["rating"] < 5).sum())  # change 4: anything under 5★
+        below3 = int((cur["rating"] < 3).sum())  # change 2: reviews under 3★
         responded_n = sum(1 for _, r in cur.iterrows() if row_key(r) in responded)
         resp_rate = responded_n / n if n else 0.0
         emoji, label = health_status(avg, n)
@@ -797,31 +854,31 @@ else:  # 🩺 Health
             "Reviews": n,
             "Avg": round(avg, 2),
             "Trend": "—" if trend is None else f"{'▲' if trend >= 0 else '▼'} {abs(trend):.2f}",
-            "Below 5★": below5,
+            "Below 3★": below3,
             "Response rate": f"{resp_rate*100:.0f}%",
             "_sev": 0 if emoji == "🔴" else 1 if emoji == "🟡" else 2,
             "_avg": avg,
         })
 
-        # Alerts reflect the selected period (change 3). "Low" = any review
-        # below 5★ (change 4); averages/status thresholds are unchanged.
+        # Alerts reflect the selected period (change 3). The per-tour warning
+        # fires for reviews below 3★ (change 2); averages/status are unchanged.
         if avg < 4.5:
             alerts.append(("🔴", f"**{tour}** ({label_full}): average {avg:.2f} over the selected period (below 4.5)."))
-        if below5 >= 1:
-            alerts.append(("🟡", f"**{tour}** ({label_full}): {below5} review(s) below 5★ in the selected period."))
+        if below3 >= 1:
+            alerts.append(("🟡", f"**{tour}** ({label_full}): {below3} review(s) below 3★ in the selected period."))
         if trend is not None and trend <= -DROP_THRESHOLD:
             alerts.append(("🟡", f"**{tour}** ({label_full}): rating down {abs(trend):.2f} vs the previous period."))
 
-    # SLA alert: unanswered 1-2★ reviews older than 48h, within the period.
+    # SLA alert: unanswered reviews below 5★ (change 1) older than 48h, in period.
     cutoff = TODAY - timedelta(days=2)
-    sla = bdf[(bdf["rating"] <= LOW_MAX) & (bdf["review_date"].dt.date <= cutoff)]
+    sla = bdf[(bdf["rating"] < 5) & (bdf["review_date"].dt.date <= cutoff)]
     if h_days is not None:
         sla = sla[sla["review_date"].dt.date > (TODAY - timedelta(days=h_days))]
     overdue = [r for _, r in sla.iterrows() if row_key(r) not in responded]
     if overdue:
         alerts.append((
             "⚪",
-            f"{len(overdue)} unanswered 1-2★ review(s) older than 48h in the selected "
+            f"{len(overdue)} unanswered sub-5★ review(s) older than 48h in the selected "
             f"period — see the Reviews tab.",
         ))
 
@@ -842,6 +899,6 @@ else:  # 🩺 Health
         st.dataframe(hdf, width="stretch", hide_index=True)
         st.caption(
             "Status from the period average: 🟢 4.8–5.0 · 🟡 4.5–4.7 · 🔴 below 4.5. "
-            "“Below 5★” counts every review under 5 stars; trend compares against the "
+            "“Below 3★” counts every review under 3 stars; trend compares against the "
             "previous equal period."
         )
