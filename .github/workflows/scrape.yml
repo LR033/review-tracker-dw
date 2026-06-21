@@ -7,7 +7,7 @@ name: Daily review scrape
 
 on:
   schedule:
-    - cron: "0 9 * * *"   # 09:00 UTC — 11:00 Paris (CEST) / 10:00 Lisbon (WEST) in summer
+    - cron: "17 9 * * *"  # 09:17 UTC — off-the-hour to reduce GitHub's scheduling delay (≈11:17 Paris CEST)
   workflow_dispatch:        # allow manual runs from the Actions tab
 
 permissions:
