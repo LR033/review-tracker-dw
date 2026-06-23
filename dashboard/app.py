@@ -135,7 +135,27 @@ def load_reviews() -> pd.DataFrame:
     df["platform_label"] = df["platform"].map(
         lambda p: PLATFORMS.get(p, {}).get("label", p.title())
     )
-    return df.sort_values("review_date", ascending=False).reset_index(drop=True)
+
+    # guruwalk only exposes month precision ("2026-06"), which parses to the 1st
+    # of the month — a misleading exact date. For those reviews we use the scrape
+    # timestamp as the effective date instead. `display_date` drives the card
+    # date, period filtering, and sorting so display and filtering stay in sync;
+    # `review_date` is preserved for the response-tracking identity key.
+    scraped = (
+        pd.to_datetime(df["scraped_at"], errors="coerce", utc=True)
+        .dt.tz_localize(None)
+        if "scraped_at" in df.columns
+        else pd.Series(pd.NaT, index=df.index)
+    )
+    month_precision = (
+        (df["platform"] == "guruwalk")
+        & (df["review_date"].dt.day == 1)
+        & scraped.notna()
+    )
+    df["display_date"] = df["review_date"]
+    df.loc[month_precision, "display_date"] = scraped[month_precision]
+
+    return df.sort_values("display_date", ascending=False).reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
@@ -341,7 +361,7 @@ def window(d: pd.DataFrame, days: int, offset: int = 0) -> pd.DataFrame:
     """Reviews in (TODAY-offset-days, TODAY-offset]."""
     hi = TODAY - timedelta(days=offset)
     lo = hi - timedelta(days=days)
-    dd = d["review_date"].dt.date
+    dd = d["display_date"].dt.date
     return d[(dd > lo) & (dd <= hi)]
 
 
@@ -571,14 +591,14 @@ if active_tab == "📋 Reviews":
     feed = bdf[bdf["rating"].between(min_rating, max_rating)].copy()
     days = PERIOD_DAYS[period]
     if days is not None:
-        feed = feed[feed["review_date"].dt.date > (TODAY - timedelta(days=days))]
+        feed = feed[feed["display_date"].dt.date > (TODAY - timedelta(days=days))]
 
     if sort_order == "Newest first":
-        feed = feed.sort_values("review_date", ascending=False)
+        feed = feed.sort_values("display_date", ascending=False)
     elif sort_order == "Lowest rated":
-        feed = feed.sort_values(["rating", "review_date"], ascending=[True, False])
+        feed = feed.sort_values(["rating", "display_date"], ascending=[True, False])
     else:
-        feed = feed.sort_values(["rating", "review_date"], ascending=[False, False])
+        feed = feed.sort_values(["rating", "display_date"], ascending=[False, False])
 
     total = len(feed)
     head = st.columns([3, 1])
@@ -598,7 +618,7 @@ if active_tab == "📋 Reviews":
         needs_attn = below5 and not needs_reply             # 3<r<5 → 4★ (yellow)
         rkey = row_key(row)
         is_resp = rkey in responded
-        date_str = row["review_date"].strftime("%d %b %Y")
+        date_str = row["display_date"].strftime("%d %b %Y")
         name = row["reviewer_name"] or "Anonymous"
         text = row["review_text"] or "<em>(no comment)</em>"
 
