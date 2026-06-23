@@ -124,7 +124,13 @@ def load_reviews() -> pd.DataFrame:
 
     df = pd.read_csv(REVIEWS_FILE, dtype=str).fillna("")
     df["rating"] = pd.to_numeric(df["rating"], errors="coerce")
-    df["review_date"] = pd.to_datetime(df["review_date"], errors="coerce")
+    # format="mixed" parses each value independently. Some platforms (e.g.
+    # guruwalk) only provide year-month dates like "2026-06"; without this,
+    # pandas infers a single "%Y-%m-%d" format and coerces those to NaT,
+    # which dropna would then silently remove (hiding the whole platform).
+    df["review_date"] = pd.to_datetime(
+        df["review_date"], errors="coerce", format="mixed"
+    )
     df = df.dropna(subset=["review_date"])
     df["platform_label"] = df["platform"].map(
         lambda p: PLATFORMS.get(p, {}).get("label", p.title())
