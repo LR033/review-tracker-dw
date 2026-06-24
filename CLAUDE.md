@@ -17,6 +17,15 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   Each inserts its own dir into `sys.path` so `import base_scraper` works.
 - `data/reviews.csv` — append-only. Schema: platform, tour_name, rating,
   reviewer_name, review_text, review_date, url, scraped_at.
+- `data/bookings.csv` — TourDash booking pull (rewritten in full each run by
+  `scrapers/tourdash_scraper.py`). Schema: booking_id, tour_name, tour_date,
+  guide, platform, booked_adults, attended_adults, status. Only confirmed
+  bookings with a check-in guide are kept; the dashboard uses it to attribute
+  reviews to guides (`dashboard/guide_match.py`: fuzzy tour name + ±1-day date).
+  Source key: `TOURDASH_API_KEY` (env for the scraper; `st.secrets` for the
+  dashboard; a GitHub Actions secret for CI). This is a REST pull of the
+  company's *own* booking system, not a review aggregator — the no-paid-API
+  rule covers review *collection* only.
 - `data/responses.csv` — written by the dashboard when a review is marked
   "responded". Schema: platform, tour_name, reviewer_name, review_date,
   responded_at. Keyed on the same `(platform, tour_name, reviewer_name,
@@ -61,9 +70,12 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   (403 + empty body, headless AND headed, stealth args insufficient;
   DataDome tier). See the stub docstring for options (owner export from
   TA Management Center is the recommended path).
+- ✅ `tourdash_scraper.py` implemented. REST pull (not Playwright) of TourDash
+  bookings → `data/bookings.csv`; rate-limited (~1 req/3.1s under the 20/60s
+  cap), paginated via `pagination.total_pages`. CI-capable; runs in `scrape.yml`.
 - ✅ `dashboard/app.py` implemented. Streamlit, dark theme + Plotly
   (matches `~/freetour-tracker/dashboard.py` style; theme in
-  `.streamlit/config.toml`). Three tabs:
+  `.streamlit/config.toml`). Four tabs:
   - **Reviews** — quick period buttons (7d/30d/90d/1y/All), sort selector
     (newest / lowest / highest), and the feed. Each card can be marked
     "responded" (persisted to `data/responses.csv`); responded reviews get a
@@ -77,6 +89,11 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   - **Health** — auto-generated alerts panel + per-tour health table (last
     30 days: count, avg, trend vs prior 30d, low-review count, response rate,
     and a 🟢 ≥4.8 / 🟡 4.5–4.7 / 🔴 <4.5 status).
+  - **Guides** — guide-level view over reviews attributed via `bookings.csv`.
+    Per-guide health table (avg, matched reviews, below-5★/below-3★, trend),
+    an alerts panel (guide with 2+ sub-3★ reviews in the period), a per-guide
+    review feed, and an "Analyze this guide" Claude button (recurring
+    complaints / praise / patterns). Shows an info note when no reviews match.
   Filters: platform + tour are global; the star-rating slider scopes the
   Reviews feed only. Both Claude features use `claude-sonnet-4-6` with the key
   from `st.secrets["ANTHROPIC_API_KEY"]`, and degrade gracefully (disabled

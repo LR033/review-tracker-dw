@@ -46,12 +46,15 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from guide_match import attach_guides
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 REVIEWS_FILE = DATA_DIR / "reviews.csv"
+BOOKINGS_FILE = DATA_DIR / "bookings.csv"  # TourDash bookings → guide attribution
 # Overridable so tests don't write to the real responses log.
 RESPONSES_FILE = Path(os.environ.get("DW_RESPONSES_CSV", str(DATA_DIR / "responses.csv")))
 RESPONSES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "responded_at"]
@@ -156,6 +159,18 @@ def load_reviews() -> pd.DataFrame:
     df.loc[month_precision, "display_date"] = scraped[month_precision]
 
     return df.sort_values("display_date", ascending=False).reset_index(drop=True)
+
+
+@st.cache_data(ttl=300)
+def load_bookings() -> pd.DataFrame:
+    """Load TourDash bookings.csv (empty frame if the file is absent)."""
+    cols = ["booking_id", "tour_name", "tour_date", "guide",
+            "platform", "booked_adults", "attended_adults", "status"]
+    if not BOOKINGS_FILE.exists():
+        return pd.DataFrame(columns=cols)
+    bdf = pd.read_csv(BOOKINGS_FILE, dtype=str).fillna("")
+    bdf["tour_date"] = pd.to_datetime(bdf["tour_date"], errors="coerce")
+    return bdf.dropna(subset=["tour_date"])
 
 
 # ---------------------------------------------------------------------------
@@ -496,6 +511,9 @@ CHART_LAYOUT = dict(margin=dict(l=0, r=10, t=30, b=0))
 PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 
 df = load_reviews()
+# Attribute each review to a guide via TourDash bookings (fuzzy tour name +
+# ±1-day date match). Adds a `guide` column, None where no confident match.
+df = attach_guides(df, load_bookings(), date_col="review_date")
 responded = load_responses()
 
 st.title("🗼 Discover Walks — Review Tracker")
@@ -557,7 +575,7 @@ if bdf.empty:
 # on every rerun. We render our own tab bar from st.button (one per tab) and
 # keep the active tab in session_state, so the selection persists across reruns.
 # The active tab is drawn as a primary button and styled distinctly via CSS.
-TAB_LABELS = ["📋 Reviews", "📊 Analytics", "🩺 Health"]
+TAB_LABELS = ["📋 Reviews", "📊 Analytics", "🩺 Health", "🧑‍🏫 Guides"]
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = TAB_LABELS[0]
 
@@ -841,7 +859,7 @@ elif active_tab == "📊 Analytics":
 # TAB 3 — HEALTH
 # ===========================================================================
 
-else:  # 🩺 Health
+elif active_tab == "🩺 Health":
     HEALTH_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "All": None}
     h_period = st.radio(
         "Period", list(HEALTH_PERIODS), index=0, horizontal=True, key="health_period"
@@ -928,3 +946,157 @@ else:  # 🩺 Health
             "“Below 3★” counts every review under 3 stars; trend compares against the "
             "previous equal period."
         )
+
+# ===========================================================================
+# TAB 4 — GUIDES
+# ===========================================================================
+
+else:  # 🧑‍🏫 Guides
+    GUIDE_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "All": None}
+    g_period = st.radio(
+        "Period", list(GUIDE_PERIODS), index=2, horizontal=True, key="guide_period"
+    )
+    g_days = GUIDE_PERIODS[g_period]
+
+    # Only reviews that matched a guide (via TourDash bookings) are in scope here.
+    gdf = bdf[bdf["guide"].notna() & (bdf["guide"].astype(str) != "")].copy()
+
+    if gdf.empty:
+        st.info(
+            "No reviews are matched to a guide yet. Guides come from "
+            "`data/bookings.csv` (the TourDash pull); a review is attributed when "
+            "its tour name fuzzy-matches a booking within ±1 day. Run "
+            "`scrapers/tourdash_scraper.py` and check the date overlap if this "
+            "stays empty."
+        )
+    else:
+        def _cur_prev_g(g):
+            """Current and previous equal-length windows for the selected period."""
+            if g_days is None:                       # "All" → no previous window
+                return g, g.iloc[0:0]
+            return window(g, g_days, 0), window(g, g_days, g_days)
+
+        # Per-guide stats over the selected period (vs the prior equal period).
+        rows = []
+        guide_alerts = []
+        for guide, g in gdf.groupby("guide"):
+            cur, prev = _cur_prev_g(g)
+            n = len(cur)
+            if n == 0:
+                continue  # only guides active in the selected period
+
+            avg = cur["rating"].mean()
+            prev_avg = prev["rating"].mean() if len(prev) else float("nan")
+            trend = (avg - prev_avg) if pd.notna(prev_avg) else None
+            below5 = int((cur["rating"] < 5).sum())
+            below3 = int((cur["rating"] < 3).sum())
+            emoji, _label = health_status(avg, n)
+
+            rows.append({
+                "Status": emoji,
+                "Guide": guide,
+                "Reviews": n,
+                "Avg": round(avg, 2),
+                "Below 5★": below5,
+                "Below 3★": below3,
+                "Trend": "—" if trend is None
+                         else f"{'▲' if trend >= 0 else '▼'} {abs(trend):.2f}",
+                "_sev": 0 if emoji == "🔴" else 1 if emoji == "🟡" else 2,
+                "_avg": avg,
+            })
+
+            # Alert: a guide with 2+ sub-3★ reviews in the selected period.
+            if below3 >= 2:
+                guide_alerts.append((
+                    "🔴",
+                    f"**{guide}**: {below3} reviews below 3★ in the selected period "
+                    f"(avg {avg:.2f} over {n} reviews).",
+                ))
+            elif avg < 4.5 and n >= 2:
+                guide_alerts.append((
+                    "🟡",
+                    f"**{guide}**: average {avg:.2f} over {n} reviews in the selected "
+                    f"period (below 4.5).",
+                ))
+
+        st.subheader("Guide alerts")
+        if not guide_alerts:
+            st.success("✅ No guide alerts — no guide has 2+ sub-3★ reviews this period.")
+        else:
+            order = {"🔴": 0, "🟡": 1}
+            for level, msg in sorted(guide_alerts, key=lambda a: order[a[0]]):
+                {"🔴": st.error, "🟡": st.warning}[level](f"{level} {msg}")
+
+        period_label = "all time" if g_days is None else f"last {g_period}"
+        st.subheader(f"Guide health — {period_label}")
+        if not rows:
+            st.info("No guide-matched reviews in the selected period.")
+        else:
+            gh = pd.DataFrame(rows).sort_values(["_sev", "_avg"]).drop(columns=["_sev", "_avg"])
+            st.dataframe(gh, width="stretch", hide_index=True)
+            st.caption(
+                "One row per guide with reviews in the period. Status from the period "
+                "average: 🟢 4.8–5.0 · 🟡 4.5–4.7 · 🔴 below 4.5. Trend compares against "
+                "the previous equal period."
+            )
+
+        st.divider()
+
+        # ---- Per-guide review feed + Claude analysis ------------------------
+        st.subheader("Per-guide reviews")
+        guide_names = sorted(gdf["guide"].unique())
+        sel_guide = st.selectbox("Guide", guide_names, key="guide_feed_select")
+
+        gsel = gdf[gdf["guide"] == sel_guide]
+        if g_days is not None:
+            gsel = gsel[gsel["display_date"].dt.date > (TODAY - timedelta(days=g_days))]
+        gsel = gsel.sort_values("display_date", ascending=False)
+
+        n_sel = len(gsel)
+        avg_sel = gsel["rating"].mean() if n_sel else float("nan")
+        st.caption(
+            f"{n_sel} matched review(s) for **{sel_guide}** · period {g_period}"
+            + (f" · avg {avg_sel:.2f}" if pd.notna(avg_sel) else "")
+        )
+
+        # Analyze this guide with Claude (recurring complaints / praise / patterns).
+        AKEY = f"analysis_guide::{sel_guide}"
+        if st.button("🔍 Analyze this guide", key="guide_analyze", disabled=client is None):
+            with st.expander(f"Claude analysis — {sel_guide}", expanded=True):
+                try:
+                    content = (
+                        "You are analysing the reviews for a single Discover Walks tour "
+                        f"guide, {sel_guide}. Identify recurring complaints, recurring "
+                        "praise, and behavioural patterns specific to this guide, and "
+                        "flag anything that needs a manager's attention.\n\n"
+                        + build_digest(gsel, f"Guide {sel_guide} ({n_sel} reviews)")
+                    )
+                    full = st.write_stream(stream_analysis(content))
+                    st.session_state[AKEY] = full
+                except Exception as exc:
+                    st.session_state[AKEY] = f"__error__{exc}"
+                    st.error(str(exc))
+        elif AKEY in st.session_state:
+            with st.expander(f"Claude analysis — {sel_guide}", expanded=True):
+                v = st.session_state[AKEY]
+                st.error(v[len("__error__"):]) if v.startswith("__error__") else st.markdown(v)
+
+        if n_sel == 0:
+            st.info("No reviews for this guide in the selected period.")
+        for _, row in gsel.iterrows():
+            rating = row["rating"]
+            low = pd.notna(rating) and rating < 3
+            date_str = row["display_date"].strftime("%d %b %Y")
+            name = row["reviewer_name"] or "Anonymous"
+            text = row["review_text"] or "<em>(no comment)</em>"
+            st.markdown(
+                f'<div class="review-card {"low" if low else ""}">'
+                f'<div class="rc-head">'
+                f'{platform_badge(row["platform"], row["platform_label"])} '
+                f'&nbsp;<span class="rc-stars">{stars(rating)}</span> '
+                f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; {date_str}</div>'
+                f'<div class="rc-tour">{row["tour_name"]}</div>'
+                f'<div class="rc-text">{text}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
