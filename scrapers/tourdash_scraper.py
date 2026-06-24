@@ -12,15 +12,28 @@ review collection" rule covers *review* collection, which this is not.
 
 API
 ---
-    GET https://tourdash.app/api/v1/bookings
+    GET https://www.tourdash.app/api/v1/bookings
         ?from=YYYY-MM-DD&to=YYYY-MM-DD&page=N&page_size=200
     Authorization: Bearer $TOURDASH_API_KEY
 
+Notes from the live API (these differ from the original integration spec):
+
+- **Host is www.tourdash.app.** The bare ``tourdash.app`` host 302-redirects to
+  ``www`` and ``requests`` drops the Authorization header across that host
+  change → 401. We call ``www`` directly.
+- **Date range must be chunked.** ``from`` must be strictly before ``to``, and a
+  span of many months returns a 500. We pull one calendar month at a time and
+  de-duplicate by booking id.
+- **The bookings list is under ``data``**; pagination under
+  ``pagination.total_pages``.
+- **``booked``/``attended`` are objects** (``{adults, children, infants}``); we
+  store the ``adults`` count.
+- **There is no "confirmed" status.** Status values are ``new`` / ``modified`` /
+  ``cancelled``. The signal for "this tour actually ran with a guide" is a
+  non-null ``checked_in_by``, so we keep bookings with a check-in guide and drop
+  only those marked ``cancelled``.
 - Rate limit: 20 requests / 60s. We pace at ~1 request / 3.1s, well under it,
-  and additionally honour a 429 ``Retry-After`` if one is ever returned.
-- Pagination: ``response["pagination"]["total_pages"]``.
-- Booking fields used: id, tour.name, tour.start_time, checked_in_by,
-  platform, booked, attended, status.
+  and honour a 429 ``Retry-After`` (default 60s) if one is returned.
 
 Output
 ------
@@ -31,9 +44,6 @@ rows). Written atomically via a temp file. Columns:
     booking_id, tour_name, tour_date, guide, platform,
     booked_adults, attended_adults, status
 
-Only **confirmed** bookings whose **checked_in_by** is set are kept — those are
-the bookings we can attribute to a guide.
-
 Run
 ---
     TOURDASH_API_KEY=... python scrapers/tourdash_scraper.py
@@ -43,13 +53,13 @@ import csv
 import os
 import sys
 import time
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
 import requests
 
-BASE_URL = "https://tourdash.app"
+BASE_URL = "https://www.tourdash.app"
 BOOKINGS_ENDPOINT = "/api/v1/bookings"
 
 START_DATE = "2025-01-01"          # pull everything from here to today
@@ -102,15 +112,16 @@ def _get(d: dict, path: str, default=None):
 def transform(booking: dict) -> Optional[dict]:
     """Map one raw API booking to a CSV row, or ``None`` to skip it.
 
-    Skips bookings that are not confirmed or have no check-in guide
-    (``checked_in_by``) — those can't be attributed to a guide.
+    Keeps bookings that have a check-in guide (``checked_in_by``) and are not
+    cancelled. The API has no "confirmed" status — a non-null check-in guide is
+    the signal that the tour ran and can be attributed to that guide.
     """
     guide = _get(booking, "checked_in_by")
     if guide is None or not str(guide).strip():
         return None
 
     status = str(_get(booking, "status", "")).strip()
-    if status.lower() != "confirmed":
+    if status.lower() == "cancelled":
         return None
 
     # tour.start_time is an ISO datetime; keep the calendar date for matching.
@@ -123,8 +134,8 @@ def transform(booking: dict) -> Optional[dict]:
         "tour_date": tour_date,
         "guide": str(guide).strip(),
         "platform": _get(booking, "platform", ""),
-        "booked_adults": _get(booking, "booked", ""),
-        "attended_adults": _get(booking, "attended", ""),
+        "booked_adults": _get(booking, "booked.adults", ""),
+        "attended_adults": _get(booking, "attended.adults", ""),
         "status": status,
     }
 
@@ -168,35 +179,60 @@ def _get_page(session: requests.Session, key: str, from_date: str,
     raise last_exc
 
 
+def _month_chunks(start: date, end: date):
+    """Yield (from, to) ISO date strings, one per calendar month, with from < to.
+
+    The API 500s on long spans, so we page month by month. Chunks are
+    de-duplicated downstream by booking id, so the rare single-day look-back
+    (when a month boundary collapses to one day) is harmless.
+    """
+    cur = start.replace(day=1)
+    while cur <= end:
+        nxt = (cur.replace(year=cur.year + 1, month=1, day=1)
+               if cur.month == 12 else cur.replace(month=cur.month + 1, day=1))
+        lo = max(cur, start)
+        hi = min(nxt - timedelta(days=1), end)
+        if lo < hi:
+            yield lo.isoformat(), hi.isoformat()
+        elif lo == hi:                      # single-day window — API needs from < to
+            yield (lo - timedelta(days=1)).isoformat(), hi.isoformat()
+        cur = nxt
+
+
 def fetch_all_bookings(key: str, from_date: str, to_date: str) -> list:
-    """Page through the whole range, returning kept (confirmed+guided) rows."""
+    """Page month-by-month over the range, returning kept (guided) rows.
+
+    Rows are de-duplicated by booking id so overlapping chunk boundaries can't
+    produce duplicate bookings.
+    """
     session = requests.Session()
-    rows = []
-    page = 1
-    total_pages = 1
+    rows = {}  # booking_id -> row
     last_request = 0.0
 
-    while page <= total_pages:
-        # Pace requests to respect the 20-req/60s limit.
-        elapsed = time.monotonic() - last_request
-        if elapsed < MIN_REQUEST_INTERVAL_S:
-            time.sleep(MIN_REQUEST_INTERVAL_S - elapsed)
-        last_request = time.monotonic()
+    for frm, to in _month_chunks(date.fromisoformat(from_date), date.fromisoformat(to_date)):
+        page = 1
+        total_pages = 1
+        while page <= total_pages:
+            # Pace requests to respect the 20-req/60s limit.
+            elapsed = time.monotonic() - last_request
+            if elapsed < MIN_REQUEST_INTERVAL_S:
+                time.sleep(MIN_REQUEST_INTERVAL_S - elapsed)
+            last_request = time.monotonic()
 
-        payload = _get_page(session, key, from_date, to_date, page)
-        total_pages = int(_get(payload, "pagination.total_pages", 1) or 1)
+            payload = _get_page(session, key, frm, to, page)
+            total_pages = int(_get(payload, "pagination.total_pages", 1) or 1)
 
-        batch = _extract_list(payload)
-        kept = 0
-        for booking in batch:
-            row = transform(booking)
-            if row is not None:
-                rows.append(row)
-                kept += 1
-        print(f"  page {page}/{total_pages}: {len(batch)} bookings, {kept} kept")
-        page += 1
+            batch = _extract_list(payload)
+            kept = 0
+            for booking in batch:
+                row = transform(booking)
+                if row is not None:
+                    rows[row["booking_id"]] = row
+                    kept += 1
+            print(f"  {frm}..{to} page {page}/{total_pages}: {len(batch)} bookings, {kept} kept")
+            page += 1
 
-    return rows
+    return list(rows.values())
 
 
 def write_bookings(rows: list) -> None:
