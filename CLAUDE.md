@@ -19,9 +19,14 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   reviewer_name, review_text, review_date, url, scraped_at.
 - `data/bookings.csv` — TourDash booking pull (rewritten in full each run by
   `scrapers/tourdash_scraper.py`). Schema: booking_id, tour_name, tour_date,
-  guide, platform, booked_adults, attended_adults, status. Only confirmed
-  bookings with a check-in guide are kept; the dashboard uses it to attribute
-  reviews to guides (`dashboard/guide_match.py`: fuzzy tour name + ±1-day date).
+  guide, contact_name, platform, booked_adults, attended_adults, status. Only
+  bookings with a check-in guide that aren't cancelled are kept. The dashboard
+  uses it to attribute reviews to guides (`dashboard/guide_match.py`):
+  **primary** = fuzzy match of review `reviewer_name` ↔ booking `contact_name`
+  (accent-folded, difflib ≥0.75, scoped to the same tour); **fallback** =
+  tour+date (±1 day) but only when exactly one guide ran that tour (ambiguous
+  multi-guide days are left unmatched, not guessed). Adds `guide` and
+  `match_method` (`name`/`date_unambiguous`/None) columns to the reviews frame.
   Source key: `TOURDASH_API_KEY` (env for the scraper; `st.secrets` for the
   dashboard; a GitHub Actions secret for CI). This is a REST pull of the
   company's *own* booking system, not a review aggregator — the no-paid-API

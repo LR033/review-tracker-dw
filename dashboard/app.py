@@ -164,7 +164,7 @@ def load_reviews() -> pd.DataFrame:
 @st.cache_data(ttl=300)
 def load_bookings() -> pd.DataFrame:
     """Load TourDash bookings.csv (empty frame if the file is absent)."""
-    cols = ["booking_id", "tour_name", "tour_date", "guide",
+    cols = ["booking_id", "tour_name", "tour_date", "guide", "contact_name",
             "platform", "booked_adults", "attended_adults", "status"]
     if not BOOKINGS_FILE.exists():
         return pd.DataFrame(columns=cols)
@@ -496,10 +496,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Manual light/dark override (change 3). Default to dark; the sidebar toggle
-# flips st.session_state["theme_mode"] and the CSS below re-applies on rerun.
+# Manual light/dark override (change 3). Default to light (matches config.toml
+# base="light"); the sidebar toggle flips st.session_state["theme_mode"] and the
+# CSS below re-applies on rerun.
 if "theme_mode" not in st.session_state:
-    st.session_state.theme_mode = "dark"
+    st.session_state.theme_mode = "light"
 st.markdown(theme_css(st.session_state.theme_mode), unsafe_allow_html=True)
 
 # No hardcoded template/background: st.plotly_chart(theme="streamlit") (the
