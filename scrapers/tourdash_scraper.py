@@ -41,7 +41,7 @@ Output
 range, so an overwrite keeps attended/status counts current and avoids stale
 rows). Written atomically via a temp file. Columns:
 
-    booking_id, tour_name, tour_date, guide, platform,
+    booking_id, tour_name, tour_date, guide, contact_name, platform,
     booked_adults, attended_adults, status
 
 Run
@@ -78,6 +78,7 @@ FIELDNAMES = [
     "tour_name",
     "tour_date",
     "guide",
+    "contact_name",
     "platform",
     "booked_adults",
     "attended_adults",
@@ -133,6 +134,9 @@ def transform(booking: dict) -> Optional[dict]:
         "tour_name": _get(booking, "tour.name", ""),
         "tour_date": tour_date,
         "guide": str(guide).strip(),
+        # The lead customer on the booking — used to match a review's reviewer
+        # name to the guide who actually ran that customer's tour.
+        "contact_name": str(_get(booking, "contact.name", "")).strip(),
         "platform": _get(booking, "platform", ""),
         "booked_adults": _get(booking, "booked.adults", ""),
         "attended_adults": _get(booking, "attended.adults", ""),

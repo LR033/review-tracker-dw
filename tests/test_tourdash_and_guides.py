@@ -103,18 +103,36 @@ def test_extract_list_tolerates_key_names():
 # ---------------------------------------------------------------------------
 
 def _bookings_df():
-    # Bookings use TourDash codes as tour_name (TM = Le Marais, MM = Montmartre).
+    # Bookings use TourDash codes as tour_name (TM = Le Marais, MM = Montmartre,
+    # LB = Left Bank), now with a contact_name (the lead customer).
+    # TM 2026-06-10 has TWO guides → ambiguous for the date fallback.
+    # MM 2026-06-12 has ONE guide; LB 2026-06-15 has one guide across two rows.
     return pd.DataFrame([
-        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "Marie"},
-        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "Marie"},
-        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "Jacques"},
-        {"tour_name": "MM", "tour_date": "2026-06-12", "guide": "Sophie"},
+        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "Marie",
+         "contact_name": "Loretta Smith"},
+        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "Jacques",
+         "contact_name": "John Doe"},
+        {"tour_name": "MM", "tour_date": "2026-06-12", "guide": "Sophie",
+         "contact_name": "Emma Brown"},
+        {"tour_name": "LB", "tour_date": "2026-06-15", "guide": "Pierre",
+         "contact_name": "Carlos Ruiz"},
+        {"tour_name": "LB", "tour_date": "2026-06-15", "guide": "Pierre",
+         "contact_name": "Maria Ruiz"},
     ]).assign(tour_date=lambda d: pd.to_datetime(d["tour_date"]))
+
+
+def _reviews(rows):
+    return pd.DataFrame(rows).assign(review_date=lambda d: pd.to_datetime(d["review_date"]))
 
 
 def test_normalize_tour():
     assert gm.normalize_tour("Le Marais — Free Tour!") == "le marais free tour"
     assert gm.normalize_tour("  Montmartre   Walk  ") == "montmartre walk"
+
+
+def test_normalize_name_folds_accents():
+    assert gm.normalize_name("Léo Armingaud") == "leo armingaud"
+    assert gm.normalize_name("  Anaëlle  Planckaert! ") == "anaelle planckaert"
 
 
 def test_booking_key():
@@ -139,56 +157,107 @@ def test_review_key_real_titles():
         assert gm.review_key(title) == expected, title
 
 
-def test_build_guide_index_picks_dominant_guide():
-    from datetime import date
-    index = gm.build_guide_index(_bookings_df())
-    # Marie has 2 check-ins that day vs Jacques' 1 → Marie wins the TM slot.
-    assert index[("TM", date(2026, 6, 10))] == "Marie"
-    assert index[("MM", date(2026, 6, 12))] == "Sophie"
+def test_name_match_is_primary_and_disambiguates():
+    # TM on 2026-06-10 has two guides; the reviewer name picks the right one,
+    # where a date-only match could not.
+    reviews = _reviews([
+        {"tour_name": "Le Marais Free Tour: Where Parisians Go",
+         "reviewer_name": "Loretta Smith", "review_date": "2026-06-10"},
+        {"tour_name": "Le Marais Free Tour: Where Parisians Go",
+         "reviewer_name": "John Doe", "review_date": "2026-06-11"},
+    ])
+    out = gm.attach_guides(reviews, _bookings_df())
+    assert list(out["guide"]) == ["Marie", "Jacques"]
+    assert list(out["match_method"]) == ["name", "name"]
 
 
-def test_attach_guides_matches_within_window():
-    reviews = pd.DataFrame([
-        # Marais title, review one day after the tour → matches TM (±1 day).
-        {"tour_name": "Le Marais Free Tour: Where Parisians Go", "review_date": "2026-06-11"},
-        # Montmartre title, exact date → matches Sophie (MM).
-        {"tour_name": "Montmartre Paris Free Tour: Moulin Rouge to Sacre Coeur",
-         "review_date": "2026-06-12"},
-        # Right tour, but 5 days off → outside the ±1 window → no match.
-        {"tour_name": "Paris: Marais without crowds", "review_date": "2026-06-20"},
-        # No keyword in the title → no key → no match.
-        {"tour_name": "Seine River Cruise", "review_date": "2026-06-10"},
-    ]).assign(review_date=lambda d: pd.to_datetime(d["review_date"]))
-
-    out = gm.attach_guides(reviews, _bookings_df(), date_col="review_date")
-    guides = list(out["guide"])
-    assert guides[0] == "Marie"
-    assert guides[1] == "Sophie"
-    assert guides[2] is None
-    assert guides[3] is None
-
-
-def test_attach_guides_prefers_exact_date():
-    # Two TM departures with different guides on adjacent days; the review is on
-    # the 10th, so the exact-date guide (Marie) must win over the ±1 neighbour.
+def test_name_match_folds_accents():
     bookings = pd.DataFrame([
-        {"tour_name": "TM", "tour_date": "2026-06-09", "guide": "Jacques"},
-        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "Marie"},
+        {"tour_name": "MM", "tour_date": "2026-06-12", "guide": "Sophie",
+         "contact_name": "Anaëlle Planckaert"},
     ]).assign(tour_date=lambda d: pd.to_datetime(d["tour_date"]))
-    reviews = pd.DataFrame([
-        {"tour_name": "Le Marais Free Tour: Where Parisians Go", "review_date": "2026-06-10"},
-    ]).assign(review_date=lambda d: pd.to_datetime(d["review_date"]))
-    out = gm.attach_guides(reviews, bookings, date_col="review_date")
-    assert out["guide"].iloc[0] == "Marie"
+    reviews = _reviews([
+        {"tour_name": "Montmartre Paris Free Tour", "reviewer_name": "Anaelle Planckaert",
+         "review_date": "2026-06-12"},
+    ])
+    out = gm.attach_guides(reviews, bookings)
+    assert out["guide"].iloc[0] == "Sophie"
+    assert out["match_method"].iloc[0] == "name"
+
+
+def test_name_match_ties_broken_by_date():
+    # Same customer name on two TM dates with different guides; the review date
+    # is closest to 2026-06-20, so guide B should win.
+    bookings = pd.DataFrame([
+        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "GuideA",
+         "contact_name": "Repeat Customer"},
+        {"tour_name": "TM", "tour_date": "2026-06-20", "guide": "GuideB",
+         "contact_name": "Repeat Customer"},
+    ]).assign(tour_date=lambda d: pd.to_datetime(d["tour_date"]))
+    reviews = _reviews([
+        {"tour_name": "Le Marais Free Tour", "reviewer_name": "Repeat Customer",
+         "review_date": "2026-06-19"},
+    ])
+    out = gm.attach_guides(reviews, bookings)
+    assert out["guide"].iloc[0] == "GuideB"
+    assert out["match_method"].iloc[0] == "name"
+
+
+def test_date_fallback_unambiguous():
+    # No name match (reviewer unknown), but MM on 2026-06-12 has a single guide.
+    reviews = _reviews([
+        {"tour_name": "Montmartre Paris Free Tour", "reviewer_name": "Nobody Here",
+         "review_date": "2026-06-12"},
+        # LB on 2026-06-15 has one distinct guide across two bookings → Pierre.
+        {"tour_name": "Paris Left Bank: Writers", "reviewer_name": "Unknown Person",
+         "review_date": "2026-06-15"},
+    ])
+    out = gm.attach_guides(reviews, _bookings_df())
+    assert list(out["guide"]) == ["Sophie", "Pierre"]
+    assert list(out["match_method"]) == ["date_unambiguous", "date_unambiguous"]
+
+
+def test_date_fallback_ambiguous_returns_none():
+    # No name match and TM on 2026-06-10 has TWO guides → ambiguous → None.
+    reviews = _reviews([
+        {"tour_name": "Le Marais Free Tour", "reviewer_name": "Totally Unknown",
+         "review_date": "2026-06-10"},
+    ])
+    out = gm.attach_guides(reviews, _bookings_df())
+    assert out["guide"].iloc[0] is None
+    assert out["match_method"].iloc[0] is None
+
+
+def test_no_key_no_match():
+    # A title with no canonical keyword can't match on name or date.
+    reviews = _reviews([
+        {"tour_name": "Seine River Cruise", "reviewer_name": "Loretta Smith",
+         "review_date": "2026-06-10"},
+    ])
+    out = gm.attach_guides(reviews, _bookings_df())
+    assert out["guide"].iloc[0] is None
+    assert out["match_method"].iloc[0] is None
+
+
+def test_attach_guides_adds_both_columns_and_valid_methods():
+    out = gm.attach_guides(
+        _reviews([{"tour_name": "Le Marais Free Tour",
+                   "reviewer_name": "Loretta Smith", "review_date": "2026-06-10"}]),
+        _bookings_df(),
+    )
+    assert "guide" in out.columns and "match_method" in out.columns
+    assert set(out["match_method"].dropna()) <= {"name", "date_unambiguous"}
 
 
 def test_attach_guides_empty_bookings():
-    reviews = pd.DataFrame([
-        {"tour_name": "Le Marais Free Tour: Where Parisians Go", "review_date": "2026-06-11"},
-    ]).assign(review_date=lambda d: pd.to_datetime(d["review_date"]))
-    out = gm.attach_guides(reviews, pd.DataFrame(), date_col="review_date")
-    assert "guide" in out.columns
+    reviews = _reviews([
+        {"tour_name": "Le Marais Free Tour", "reviewer_name": "Loretta Smith",
+         "review_date": "2026-06-11"},
+    ])
+    out = gm.attach_guides(reviews, pd.DataFrame())
+    assert "guide" in out.columns and "match_method" in out.columns
     assert out["guide"].iloc[0] is None
+    assert out["match_method"].iloc[0] is None
 
 
 # ---------------------------------------------------------------------------

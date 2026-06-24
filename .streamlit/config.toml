@@ -1,8 +1,10 @@
 # Theme for the Discover Walks review dashboard.
-# No `base` is set, so Streamlit follows the viewer's system light/dark
-# preference. Only the accent colour is pinned — to a neutral slate-blue
-# (less visually aggressive than the previous red) so filter chips, the
-# slider, and primary buttons read as calm/neutral in both modes.
+# `base = "light"` so the dashboard opens in light mode by default. The sidebar
+# dark/light toggle still works (it applies its own CSS override at runtime via
+# theme_css() in app.py). Only the accent colour is pinned — to a neutral
+# slate-blue (less visually aggressive than the previous red) so filter chips,
+# the slider, and primary buttons read as calm/neutral in both modes.
 [theme]
+base = "light"
 primaryColor = "#5B7A99"
 font = "sans serif"
