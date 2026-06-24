@@ -3,92 +3,141 @@ Guide attribution: match scraped reviews to the guide who ran the tour.
 
 Booking data comes from TourDash (``data/bookings.csv``, produced by
 ``scrapers/tourdash_scraper.py``); each confirmed booking carries the guide who
-checked the guests in plus the tour name and date. Reviews come from the public
-platforms and use *their own* tour names and a review date that is only roughly
-the visit date. So matching is fuzzy on two axes:
+checked the guests in, the tour, and the date. Reviews come from the public
+platforms.
 
-- **Tour name** — normalised (lower-cased, punctuation stripped, whitespace
-  collapsed) then compared with :func:`difflib.SequenceMatcher` ratio. A review
-  is attributed only if the best candidate clears ``MATCH_THRESHOLD``.
-- **Date** — a review is matched against bookings within ``DATE_WINDOW`` days of
-  the review date, to absorb the slack between a tour and its review.
+The two sides name tours completely differently: TourDash uses short **codes**
+(``LB``, ``MM``, ``TM``, ``HG``, ``HIP``, ``ND``) while the review platforms use
+full marketing titles ("Le Marais Free Tour: Where Parisians Go"). Fuzzy string
+matching can't bridge that, so we map **both** sides to a shared canonical key
+(the code) and then match exactly on **key + date (± a small day window)**:
 
-This module is deliberately free of Streamlit/pandas-display concerns and side
-effects so it can be unit-tested directly. ``attach_guides`` takes the reviews
-and bookings DataFrames and returns a copy of the reviews with a ``guide``
-column (``None`` where no confident match is found).
+1. Booking ``tour_name`` is already the code → canonical key directly.
+2. Review ``tour_name`` → canonical key via keyword matching on the title.
+3. A review matches a booking when their canonical keys are equal and the
+   review date is within ``DATE_WINDOW`` days of the tour date (exact date
+   preferred). When a (key, date) slot had several guides, the one who checked
+   in the most guests that day wins.
+
+This module is deliberately free of Streamlit so it can be unit-tested directly.
+``attach_guides`` takes the reviews and bookings DataFrames and returns a copy
+of the reviews with a ``guide`` column (``None`` where no match is found).
 """
 
 import re
-from collections import defaultdict
 from datetime import timedelta
-from difflib import SequenceMatcher
+from typing import Optional
 
 import pandas as pd
 
-MATCH_THRESHOLD = 0.6   # min SequenceMatcher ratio on normalised tour names
-DATE_WINDOW = 1         # ± days around the review date to search bookings
+DATE_WINDOW = 1  # ± days around the review date to search bookings
+
+# Canonical tour keys are the TourDash codes. Bookings already store the code as
+# their tour_name; reviews are mapped onto these via keywords below.
+BOOKING_CODES = {"LB", "MM", "TM", "HG", "HIP", "ND"}
+
+# Human-readable names for the codes (for reference / labels).
+CODE_TO_NAME = {
+    "LB": "Left Bank",
+    "MM": "Montmartre",
+    "TM": "Le Marais",
+    "HG": "Places Parisians Love",
+    "HIP": "Paris Icons Express",
+    "ND": "Notre-Dame (inactive)",
+}
+
+# Keyword → canonical key for review titles. Matched against a normalised title
+# (lower-cased, punctuation→space), first hit wins. Keywords are written in that
+# normalised form (e.g. "notre dame", not "Notre-Dame"). Reviews never map to ND
+# (the inactive Notre-Dame code) — Notre-Dame/Louvre titles are the current
+# "Paris Icons Express" (HIP) tour.
+REVIEW_KEYWORDS = (
+    ("marais", "TM"),
+    ("montmartre", "MM"),
+    ("left bank", "LB"),
+    ("parisians love", "HG"),
+    ("hidden gems", "HG"),
+    ("icons", "HIP"),
+    ("notre dame", "HIP"),
+    ("louvre", "HIP"),
+)
 
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 
 
 def normalize_tour(name) -> str:
-    """Lower-case, strip punctuation, collapse whitespace for fuzzy comparison."""
+    """Lower-case, strip punctuation, collapse whitespace."""
     return " ".join(_NON_ALNUM.sub(" ", str(name).lower()).split())
 
 
-def build_guide_index(bookings: pd.DataFrame):
-    """Build a ``date -> [(tour_norm, guide), ...]`` lookup from bookings.
+def booking_key(tour_name) -> Optional[str]:
+    """Canonical key for a TourDash booking tour_name (the code itself)."""
+    code = str(tour_name).strip().upper()
+    return code if code in BOOKING_CODES else None
 
-    Expects columns ``tour_name``, ``tour_date`` (datetime64), ``guide``. When a
-    (tour, date) slot has several guides (multiple departures), the guide who
-    checked in the most bookings that day wins — a single, stable attribution.
+
+def review_key(tour_name) -> Optional[str]:
+    """Canonical key for a review's marketing title, via keyword match."""
+    norm = normalize_tour(tour_name)
+    for keyword, key in REVIEW_KEYWORDS:
+        if keyword in norm:
+            return key
+    return None
+
+
+def build_guide_index(bookings: pd.DataFrame) -> dict:
+    """Build a ``(canonical_key, date) -> guide`` lookup from bookings.
+
+    Expects columns ``tour_name`` (code), ``tour_date`` (datetime/parseable),
+    ``guide``. When a slot has several guides (multiple departures), the guide
+    who checked in the most guests that day wins — a single, stable attribution.
     """
-    by_date = defaultdict(list)
+    index: dict = {}
     if bookings is None or bookings.empty:
-        return by_date
+        return index
 
     work = bookings.copy()
-    work["_tour_norm"] = work["tour_name"].map(normalize_tour)
+    work["_key"] = work["tour_name"].map(booking_key)
     work["_date"] = pd.to_datetime(work["tour_date"], errors="coerce").dt.date
     work = work.dropna(subset=["_date"])
+    work = work[work["_key"].notna()]
     work = work[work["guide"].astype(str).str.strip() != ""]
 
-    # Count bookings per (date, tour_norm, guide), then keep the top guide per slot.
-    counts = work.groupby(["_date", "_tour_norm", "guide"]).size()
-    best = {}  # (date, tour_norm) -> (guide, count)
-    for (d, tour_norm, guide), cnt in counts.items():
-        key = (d, tour_norm)
-        if key not in best or cnt > best[key][1]:
-            best[key] = (guide, cnt)
-
-    for (d, tour_norm), (guide, _cnt) in best.items():
-        by_date[d].append((tour_norm, guide))
-    return by_date
+    # Count bookings per (date, key, guide); keep the top guide per (key, date).
+    counts = work.groupby(["_date", "_key", "guide"]).size()
+    best: dict = {}  # (key, date) -> (guide, count)
+    for (d, key, guide), cnt in counts.items():
+        slot = (key, d)
+        if slot not in best or cnt > best[slot][1]:
+            best[slot] = (guide, cnt)
+    return {slot: guide for slot, (guide, _cnt) in best.items()}
 
 
-def match_one(tour_norm: str, review_date, by_date,
-              threshold: float = MATCH_THRESHOLD, window: int = DATE_WINDOW):
-    """Return the best-matching guide for one review, or ``None``.
+def _deltas(window: int):
+    """Day offsets to try, exact date first then outward: 0, -1, +1, -2, +2…"""
+    yield 0
+    for off in range(1, window + 1):
+        yield -off
+        yield off
 
-    ``review_date`` is a ``datetime.date``; ``by_date`` is the index from
-    :func:`build_guide_index`.
+
+def match_one(key: Optional[str], review_date, index: dict,
+              window: int = DATE_WINDOW) -> Optional[str]:
+    """Return the guide for one review's (key, date), or ``None``.
+
+    Tries the exact tour date first, then expands outward within ``window``.
     """
-    if review_date is None or pd.isna(review_date):
+    if key is None or review_date is None or pd.isna(review_date):
         return None
-
-    best_guide, best_ratio = None, 0.0
-    for delta in range(-window, window + 1):
-        for cand_norm, guide in by_date.get(review_date + timedelta(days=delta), ()):
-            ratio = SequenceMatcher(None, tour_norm, cand_norm).ratio()
-            if ratio > best_ratio:
-                best_ratio, best_guide = ratio, guide
-    return best_guide if best_ratio >= threshold else None
+    for delta in _deltas(window):
+        guide = index.get((key, review_date + timedelta(days=delta)))
+        if guide is not None:
+            return guide
+    return None
 
 
 def attach_guides(reviews: pd.DataFrame, bookings: pd.DataFrame,
                   date_col: str = "review_date",
-                  threshold: float = MATCH_THRESHOLD,
                   window: int = DATE_WINDOW) -> pd.DataFrame:
     """Return a copy of ``reviews`` with a ``guide`` column (``None`` if unmatched).
 
@@ -100,20 +149,20 @@ def attach_guides(reviews: pd.DataFrame, bookings: pd.DataFrame,
     if bookings is None or bookings.empty or out.empty:
         return out
 
-    by_date = build_guide_index(bookings)
-    if not by_date:
+    index = build_guide_index(bookings)
+    if not index:
         return out
 
-    rev_norm = out["tour_name"].map(normalize_tour)
+    rev_keys = out["tour_name"].map(review_key)
     rev_dates = pd.to_datetime(out[date_col], errors="coerce").dt.date
 
-    cache = {}  # (tour_norm, date) -> guide, since reviews repeat tour/date a lot
+    cache: dict = {}  # (key, date) -> guide, since reviews repeat tour/date a lot
     guides = []
-    for tour_norm, rdate in zip(rev_norm, rev_dates):
-        key = (tour_norm, rdate)
-        if key not in cache:
-            cache[key] = match_one(tour_norm, rdate, by_date, threshold, window)
-        guides.append(cache[key])
+    for key, rdate in zip(rev_keys, rev_dates):
+        slot = (key, rdate)
+        if slot not in cache:
+            cache[slot] = match_one(key, rdate, index, window)
+        guides.append(cache[slot])
 
     out["guide"] = guides
     return out
