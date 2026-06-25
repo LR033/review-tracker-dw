@@ -23,7 +23,8 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   bookings with a check-in guide that aren't cancelled are kept. The dashboard
   uses it to attribute reviews to guides (`dashboard/guide_match.py`):
   **primary** = fuzzy match of review `reviewer_name` ↔ booking `contact_name`
-  (accent-folded, difflib ≥0.75, scoped to the same tour); **fallback** =
+  (accent-folded, rapidfuzz `token_set_ratio` ≥75, scoped to the same tour);
+  **fallback** =
   tour+date (±1 day) but only when exactly one guide ran that tour (ambiguous
   multi-guide days are left unmatched, not guessed). Adds `guide` and
   `match_method` (`name`/`date_unambiguous`/None) columns to the reviews frame.

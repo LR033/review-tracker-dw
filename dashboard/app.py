@@ -161,16 +161,41 @@ def load_reviews() -> pd.DataFrame:
     return df.sort_values("display_date", ascending=False).reset_index(drop=True)
 
 
-@st.cache_data(ttl=300)
+BOOKINGS_LOOKBACK_MONTHS = 18  # only recent bookings are needed for matching
+
+
+@st.cache_data(ttl=3600)
 def load_bookings() -> pd.DataFrame:
-    """Load TourDash bookings.csv (empty frame if the file is absent)."""
+    """Load recent TourDash bookings (empty frame if the file is absent).
+
+    Cached for an hour and limited to the last ``BOOKINGS_LOOKBACK_MONTHS`` so
+    the guide-matching lookup stays bounded as bookings.csv grows over time
+    (reviews are recent, so older bookings can't match anything anyway).
+    """
     cols = ["booking_id", "tour_name", "tour_date", "guide", "contact_name",
             "platform", "booked_adults", "attended_adults", "status"]
     if not BOOKINGS_FILE.exists():
         return pd.DataFrame(columns=cols)
     bdf = pd.read_csv(BOOKINGS_FILE, dtype=str).fillna("")
     bdf["tour_date"] = pd.to_datetime(bdf["tour_date"], errors="coerce")
-    return bdf.dropna(subset=["tour_date"])
+    bdf = bdf.dropna(subset=["tour_date"])
+    cutoff = pd.Timestamp(TODAY) - pd.DateOffset(months=BOOKINGS_LOOKBACK_MONTHS)
+    return bdf[bdf["tour_date"] >= cutoff].reset_index(drop=True)
+
+
+@st.cache_data(ttl=3600)
+def load_reviews_with_guides() -> pd.DataFrame:
+    """Reviews with guide attribution attached.
+
+    Guide matching is the expensive step (fuzzy name matching over thousands of
+    bookings), so it lives here behind an hour-long cache instead of running on
+    every Streamlit rerun. Returns the reviews frame plus `guide` and
+    `match_method` columns.
+    """
+    reviews = load_reviews()
+    if reviews.empty:
+        return reviews
+    return attach_guides(reviews, load_bookings(), date_col="review_date")
 
 
 # ---------------------------------------------------------------------------
@@ -511,10 +536,9 @@ CHART_LAYOUT = dict(margin=dict(l=0, r=10, t=30, b=0))
 # container width (use_container_width=True), so no width kwarg is needed.
 PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 
-df = load_reviews()
-# Attribute each review to a guide via TourDash bookings (fuzzy tour name +
-# ±1-day date match). Adds a `guide` column, None where no confident match.
-df = attach_guides(df, load_bookings(), date_col="review_date")
+# Reviews + guide attribution, both behind caches (the fuzzy matching is too
+# slow to run on every rerun — see load_reviews_with_guides).
+df = load_reviews_with_guides()
 responded = load_responses()
 
 st.title("🗼 Discover Walks — Review Tracker")

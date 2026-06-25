@@ -185,6 +185,31 @@ def test_name_match_folds_accents():
     assert out["match_method"].iloc[0] == "name"
 
 
+def test_name_threshold_is_0_100_scale():
+    # rapidfuzz token_set_ratio returns 0–100, so the threshold is 75 (not 0.75).
+    assert gm.NAME_THRESHOLD == 75
+
+
+def test_name_match_handles_abbreviated_last_name():
+    # token_set_ratio matches an abbreviated last name ("Sarah M." ↔ "Sarah
+    # Mitchell") where difflib's full-string ratio would not — the reason for
+    # the rapidfuzz switch. TM that day has two guides, so a "name" result
+    # (not None/date_unambiguous) proves the abbreviated name matched.
+    bookings = pd.DataFrame([
+        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "Marie",
+         "contact_name": "Sarah Mitchell"},
+        {"tour_name": "TM", "tour_date": "2026-06-10", "guide": "Jacques",
+         "contact_name": "Other Person"},
+    ]).assign(tour_date=lambda d: pd.to_datetime(d["tour_date"]))
+    reviews = _reviews([
+        {"tour_name": "Le Marais Free Tour", "reviewer_name": "Sarah M.",
+         "review_date": "2026-06-10"},
+    ])
+    out = gm.attach_guides(reviews, bookings)
+    assert out["guide"].iloc[0] == "Marie"
+    assert out["match_method"].iloc[0] == "name"
+
+
 def test_name_match_ties_broken_by_date():
     # Same customer name on two TM dates with different guides; the review date
     # is closest to 2026-06-20, so guide B should win.
