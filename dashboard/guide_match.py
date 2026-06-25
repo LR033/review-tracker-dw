@@ -10,11 +10,12 @@ Matching is two-tier, preferring the precise signal:
 
 1. **Name match (primary).** Normalise the review's ``reviewer_name`` and the
    booking's ``contact_name`` (accent-folded, lower-cased, punctuation
-   stripped) and fuzzy-compare them with :class:`difflib.SequenceMatcher`. To
-   avoid cross-tour collisions of common names, candidates are restricted to
-   bookings on the *same canonical tour* (see the keyword map below); ties on
-   the match score are broken by date proximity. A match at or above
-   ``NAME_THRESHOLD`` attributes that booking's guide (``match_method="name"``).
+   stripped) and fuzzy-compare them with rapidfuzz ``token_set_ratio`` (0–100,
+   token-aware so "Sarah M." still matches "Sarah Mitchell"). To avoid
+   cross-tour collisions of common names, candidates are restricted to bookings
+   on the *same canonical tour* (see the keyword map below); ties on the match
+   score are broken by date proximity. A match at or above ``NAME_THRESHOLD``
+   attributes that booking's guide (``match_method="name"``).
 
 2. **Date fallback (secondary).** Only used when the name match fails. Look at
    bookings for the review's tour within ``DATE_WINDOW`` days of the review
@@ -36,13 +37,16 @@ import re
 import unicodedata
 from collections import defaultdict
 from datetime import timedelta
-from difflib import SequenceMatcher
 from typing import Optional
 
 import pandas as pd
+from rapidfuzz import fuzz
 
 DATE_WINDOW = 1       # ± days around the review date for the date fallback
-NAME_THRESHOLD = 0.75  # min SequenceMatcher ratio for a reviewer↔contact name match
+# Min rapidfuzz token_set_ratio (0–100) for a reviewer↔contact name match.
+# token_set_ratio is token-aware, so abbreviated names ("Sarah M." vs
+# "Sarah Mitchell") and reordered names still score well.
+NAME_THRESHOLD = 75
 
 # Canonical tour keys are the TourDash codes. Bookings already store the code as
 # their tour_name; reviews are mapped onto these via keywords below.
@@ -160,7 +164,7 @@ def _name_match(key, reviewer_name, review_date, name_index, threshold):
 
     best_ratio, best_contacts = 0.0, []
     for cn in cn_map:
-        ratio = SequenceMatcher(None, rn, cn).ratio()
+        ratio = fuzz.token_set_ratio(rn, cn)
         if ratio > best_ratio:
             best_ratio, best_contacts = ratio, [cn]
         elif ratio == best_ratio:

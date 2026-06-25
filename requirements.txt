@@ -4,3 +4,4 @@ streamlit>=1.30
 plotly>=5.18
 anthropic>=0.40
 requests>=2.31
+rapidfuzz>=3.0
