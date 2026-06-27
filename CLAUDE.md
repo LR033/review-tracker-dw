@@ -27,9 +27,11 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   **fallback** =
   tour+date (±1 day) but only when exactly one guide ran that tour (ambiguous
   multi-guide days are left unmatched, not guessed). Adds `guide` and
-  `match_method` (`name`/`date_unambiguous`/None) columns to the reviews frame.
-  Source key: `TOURDASH_API_KEY` (env for the scraper; `st.secrets` for the
-  dashboard; a GitHub Actions secret for CI). This is a REST pull of the
+  `match_method` (`name`/`date_unambiguous`/`manual`/None) columns to the
+  reviews frame. `load_bookings()` drops `guide == "Discover Walks"` (a
+  company-level placeholder, not a real guide) and is limited to the last 18
+  months. Source key: `TOURDASH_API_KEY` (env for the scraper; `st.secrets` for
+  the dashboard; a GitHub Actions secret for CI). This is a REST pull of the
   company's *own* booking system, not a review aggregator — the no-paid-API
   rule covers review *collection* only.
 - `data/responses.csv` — written by the dashboard when a review is marked
@@ -37,6 +39,14 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   responded_at. Keyed on the same `(platform, tour_name, reviewer_name,
   review_date)` tuple the scrapers dedup on. Path is overridable via the
   `DW_RESPONSES_CSV` env var (used by the dashboard tests).
+- `data/notes.csv` — per-review internal notes from the dashboard. Schema:
+  platform, tour_name, reviewer_name, review_date, note, updated_at. Same key
+  tuple; path overridable via `DW_NOTES_CSV`.
+- `data/guide_overrides.csv` — manual guide reassignments from the Guides tab.
+  Schema: platform, tour_name, reviewer_name, review_date, guide (blank = clear
+  attribution). `guide_match.apply_overrides()` applies these on top of the
+  automatic match (sets `match_method="manual"`); they take priority. Path
+  overridable via `DW_OVERRIDES_CSV`.
 - `dashboard/app.py` — Streamlit dashboard (3 tabs; see Status).
 - `.github/workflows/scrape.yml` — daily cron; only runs implemented
   scrapers; add new ones to its "Run scrapers" step.
