@@ -286,6 +286,64 @@ def test_attach_guides_empty_bookings():
 
 
 # ---------------------------------------------------------------------------
+# guide_match.apply_overrides (manual reassignment)
+# ---------------------------------------------------------------------------
+
+def _matched(rows):
+    df = pd.DataFrame(rows)
+    df["review_date"] = pd.to_datetime(df["review_date"])
+    for col in ("guide", "match_method"):
+        if col not in df.columns:
+            df[col] = None
+    return df
+
+
+def test_apply_overrides_sets_guide_manual():
+    reviews = _matched([
+        {"platform": "getyourguide", "tour_name": "Le Marais Free Tour",
+         "reviewer_name": "Jane Doe", "review_date": "2026-06-10",
+         "guide": "Marie", "match_method": "name"},
+        {"platform": "freetour", "tour_name": "Montmartre Tour",
+         "reviewer_name": "Bob", "review_date": "2026-06-11",
+         "guide": None, "match_method": None},
+    ])
+    overrides = pd.DataFrame([
+        {"platform": "getyourguide", "tour_name": "Le Marais Free Tour",
+         "reviewer_name": "Jane Doe", "review_date": "2026-06-10", "guide": "Sophie"},
+    ])
+    out = gm.apply_overrides(reviews, overrides)
+    # Override beats the automatic match on the first row only.
+    assert out["guide"].iloc[0] == "Sophie"
+    assert out["match_method"].iloc[0] == "manual"
+    assert out["guide"].iloc[1] is None
+
+
+def test_apply_overrides_blank_clears_attribution():
+    reviews = _matched([
+        {"platform": "gyg", "tour_name": "X", "reviewer_name": "A",
+         "review_date": "2026-06-10", "guide": "Marie", "match_method": "name"},
+    ])
+    overrides = pd.DataFrame([
+        {"platform": "gyg", "tour_name": "X", "reviewer_name": "A",
+         "review_date": "2026-06-10", "guide": ""},
+    ])
+    out = gm.apply_overrides(reviews, overrides)
+    assert out["guide"].iloc[0] is None
+    assert out["match_method"].iloc[0] is None
+
+
+def test_apply_overrides_empty_is_noop():
+    reviews = _matched([
+        {"platform": "gyg", "tour_name": "X", "reviewer_name": "A",
+         "review_date": "2026-06-10", "guide": "Marie", "match_method": "name"},
+    ])
+    out = gm.apply_overrides(reviews, pd.DataFrame(columns=[
+        "platform", "tour_name", "reviewer_name", "review_date", "guide"]))
+    assert out["guide"].iloc[0] == "Marie"
+    assert out["match_method"].iloc[0] == "name"
+
+
+# ---------------------------------------------------------------------------
 # Minimal runner (so it works without pytest)
 # ---------------------------------------------------------------------------
 

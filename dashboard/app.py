@@ -38,6 +38,7 @@ Run:
     streamlit run dashboard/app.py
 """
 
+import html
 import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -46,7 +47,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from guide_match import attach_guides
+from guide_match import apply_overrides, attach_guides
 
 # ---------------------------------------------------------------------------
 # Config
@@ -55,9 +56,13 @@ from guide_match import attach_guides
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 REVIEWS_FILE = DATA_DIR / "reviews.csv"
 BOOKINGS_FILE = DATA_DIR / "bookings.csv"  # TourDash bookings → guide attribution
-# Overridable so tests don't write to the real responses log.
+# Overridable so tests don't write to the real logs.
 RESPONSES_FILE = Path(os.environ.get("DW_RESPONSES_CSV", str(DATA_DIR / "responses.csv")))
 RESPONSES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "responded_at"]
+NOTES_FILE = Path(os.environ.get("DW_NOTES_CSV", str(DATA_DIR / "notes.csv")))
+NOTES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "note", "updated_at"]
+OVERRIDES_FILE = Path(os.environ.get("DW_OVERRIDES_CSV", str(DATA_DIR / "guide_overrides.csv")))
+OVERRIDES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "guide"]
 
 # Both Claude features use Sonnet per the product spec.
 REPLY_MODEL = "claude-sonnet-4-6"
@@ -179,6 +184,8 @@ def load_bookings() -> pd.DataFrame:
     bdf = pd.read_csv(BOOKINGS_FILE, dtype=str).fillna("")
     bdf["tour_date"] = pd.to_datetime(bdf["tour_date"], errors="coerce")
     bdf = bdf.dropna(subset=["tour_date"])
+    # "Discover Walks" is a company-level booking, not a real guide attribution.
+    bdf = bdf[bdf["guide"].astype(str).str.strip().str.lower() != "discover walks"]
     cutoff = pd.Timestamp(TODAY) - pd.DateOffset(months=BOOKINGS_LOOKBACK_MONTHS)
     return bdf[bdf["tour_date"] >= cutoff].reset_index(drop=True)
 
@@ -267,6 +274,109 @@ def set_responded(row, responded: bool) -> None:
     RESPONSES_FILE.parent.mkdir(parents=True, exist_ok=True)
     rdf.to_csv(RESPONSES_FILE, index=False)
     load_responses.clear()
+
+
+# ---------------------------------------------------------------------------
+# Internal notes (data/notes.csv)
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=5)
+def load_notes() -> dict:
+    """Return {review_key: note_text} from notes.csv."""
+    if not NOTES_FILE.exists():
+        return {}
+    try:
+        ndf = pd.read_csv(NOTES_FILE, dtype=str).fillna("")
+    except Exception:
+        return {}
+    out = {}
+    for _, r in ndf.iterrows():
+        out[_norm_key(r.get("platform", ""), r.get("tour_name", ""),
+                      r.get("reviewer_name", ""), r.get("review_date", ""))] = \
+            r.get("note", "")
+    return out
+
+
+def save_note(row, note_text: str) -> None:
+    """Upsert one review's internal note in notes.csv (empty note removes it)."""
+    key_fields = (
+        str(row["platform"]), str(row["tour_name"]), str(row["reviewer_name"]),
+        row["review_date"].strftime("%Y-%m-%d"),
+    )
+    target = _norm_key(*key_fields)
+
+    if NOTES_FILE.exists():
+        ndf = pd.read_csv(NOTES_FILE, dtype=str).fillna("")
+    else:
+        ndf = pd.DataFrame(columns=NOTES_COLS)
+
+    if not ndf.empty:
+        keep = ndf.apply(
+            lambda r: _norm_key(r["platform"], r["tour_name"],
+                                r["reviewer_name"], r["review_date"]) != target,
+            axis=1,
+        )
+        ndf = ndf[keep]
+
+    if note_text and note_text.strip():
+        ndf = pd.concat([ndf, pd.DataFrame([{
+            "platform": key_fields[0], "tour_name": key_fields[1],
+            "reviewer_name": key_fields[2], "review_date": key_fields[3],
+            "note": note_text.strip(),
+            "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }])], ignore_index=True)
+
+    NOTES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ndf.to_csv(NOTES_FILE, index=False)
+    load_notes.clear()
+
+
+def _save_note_cb(row, note_key: str) -> None:
+    """on_change callback for a note text_area — persists the edited text."""
+    save_note(row, st.session_state.get(note_key, ""))
+
+
+# ---------------------------------------------------------------------------
+# Manual guide overrides (data/guide_overrides.csv)
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=5)
+def load_overrides() -> pd.DataFrame:
+    """Return guide_overrides.csv as a DataFrame (empty if absent)."""
+    if not OVERRIDES_FILE.exists():
+        return pd.DataFrame(columns=OVERRIDES_COLS)
+    try:
+        return pd.read_csv(OVERRIDES_FILE, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame(columns=OVERRIDES_COLS)
+
+
+def save_guide_override(row, guide) -> None:
+    """Upsert one review's manual guide override (``None``/"" clears the guide)."""
+    key_fields = (
+        str(row["platform"]), str(row["tour_name"]), str(row["reviewer_name"]),
+        row["review_date"].strftime("%Y-%m-%d"),
+    )
+    target = _norm_key(*key_fields)
+
+    odf = load_overrides()
+    if not odf.empty:
+        keep = odf.apply(
+            lambda r: _norm_key(r["platform"], r["tour_name"],
+                                r["reviewer_name"], r["review_date"]) != target,
+            axis=1,
+        )
+        odf = odf[keep]
+
+    odf = pd.concat([odf, pd.DataFrame([{
+        "platform": key_fields[0], "tour_name": key_fields[1],
+        "reviewer_name": key_fields[2], "review_date": key_fields[3],
+        "guide": "" if guide in (None, "None") else str(guide),
+    }])], ignore_index=True)
+
+    OVERRIDES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    odf.to_csv(OVERRIDES_FILE, index=False)
+    load_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +588,21 @@ st.markdown(
     .review-card.low .rc-stars { color: #E63946; }
     .review-card .rc-tour { opacity: 0.6; font-size: 12px; margin: 2px 0 6px; }
     .review-card .rc-text { font-size: 16px; line-height: 1.45; }
+    .rc-note { font-style: italic; opacity: 0.7; font-size: 13px; margin-top: 8px; }
+
+    /* Review-card container (keys: revcard_*, revcardlow_*): the box that wraps
+       the review text AND its controls (responded checkbox, note input) so they
+       read as one card. Mirrors .review-card styling. */
+    div[class*="st-key-revcard_"], div[class*="st-key-revcardlow_"] {
+        background: rgba(128,128,128,0.10); border-radius: 12px;
+        padding: 12px 18px 8px; margin-bottom: 10px; border-left: 4px solid #2A9D8F;
+    }
+    div[class*="st-key-revcardlow_"] {
+        border-left-color: #E63946; background: rgba(230,57,70,0.10);
+    }
+    /* Compact the note textarea inside the card. */
+    div[class*="st-key-revcard_"] textarea,
+    div[class*="st-key-revcardlow_"] textarea { font-size: 13px; }
 
     /* Tab navigation — st.button styled as real tabs (keys: tabbtn_0..n).
        Translucent neutrals + inherited text colour adapt to light/dark. */
@@ -539,7 +664,11 @@ PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 # Reviews + guide attribution, both behind caches (the fuzzy matching is too
 # slow to run on every rerun — see load_reviews_with_guides).
 df = load_reviews_with_guides()
+# Manual overrides are cheap and applied fresh each rerun, so a saved
+# reassignment shows immediately (they take priority over auto-matching).
+df = apply_overrides(df, load_overrides())
 responded = load_responses()
+notes = load_notes()
 
 st.title("🗼 Discover Walks — Review Tracker")
 st.caption("Aggregated customer reviews across booking platforms · drafting & analysis powered by Claude.")
@@ -646,9 +775,9 @@ if active_tab == "📋 Reviews":
     total = len(feed)
     head = st.columns([3, 1])
     head[0].caption(f"{total:,} reviews in scope · period {period} · {sort_order.lower()}.")
-    show_n = head[1].number_input(
-        "Show", min_value=5, max_value=200, value=min(25, max(total, 5)), step=5,
-        label_visibility="collapsed",
+    show_n = head[1].selectbox(
+        "Show", [50, 75, 100, 150], index=0,
+        label_visibility="collapsed", key="rev_show_n",
     )
 
     if total == 0:
@@ -661,6 +790,7 @@ if active_tab == "📋 Reviews":
         needs_attn = below5 and not needs_reply             # 3<r<5 → 4★ (yellow)
         rkey = row_key(row)
         is_resp = rkey in responded
+        existing_note = notes.get(rkey, "")
         date_str = row["display_date"].strftime("%d %b %Y")
         name = row["reviewer_name"] or "Anonymous"
         text = row["review_text"] or "<em>(no comment)</em>"
@@ -675,50 +805,74 @@ if active_tab == "📋 Reviews":
         elif needs_attn:
             badge = " &nbsp;" + _pill("⚠ Needs attention", "#E9C46A", fg="#5a4500")
 
-        st.markdown(
-            f'<div class="review-card {"low" if needs_reply else ""}">'
-            f'<div class="rc-head">{platform_badge(row["platform"], row["platform_label"])} '
-            f'&nbsp;<span class="rc-stars">{stars(rating)}</span> '
-            f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; {date_str}{badge}</div>'
-            f'<div class="rc-tour">{row["tour_name"]}</div>'
-            f'<div class="rc-text">{text}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
+        # The whole review (content + controls) lives in a keyed container so
+        # the responded checkbox and note input render inside the card, not
+        # in a detached row below it. The container provides the card box (CSS
+        # on st-key-revcard*); the inner div is transparent and only supplies
+        # the rc-* text styling.
+        note_html = (
+            f'<div class="rc-note">📝 {html.escape(existing_note)}</div>'
+            if existing_note else ""
         )
+        card_key = f"revcardlow_{idx}" if needs_reply else f"revcard_{idx}"
+        with st.container(key=card_key):
+            st.markdown(
+                f'<div class="review-card{" low" if needs_reply else ""}" '
+                f'style="background:none;border:none;padding:0;margin:0;">'
+                f'<div class="rc-head">'
+                f'{platform_badge(row["platform"], row["platform_label"])} '
+                f'&nbsp;<span class="rc-stars">{stars(rating)}</span> '
+                f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; {date_str}{badge}</div>'
+                f'<div class="rc-tour">{row["tour_name"]}</div>'
+                f'<div class="rc-text">{text}</div>'
+                f'{note_html}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
-        ctrl = st.columns([1, 1, 3])
+            ctrl = st.columns([1, 1, 2])
 
-        # Mark-as-responded checkbox — tracked for all reviews below 5★
-        # (change 1); 5★ reviews don't need a response, so no checkbox.
-        if below5:
-            cb_key = f"resp_{idx}"
-            if cb_key not in st.session_state:
-                st.session_state[cb_key] = is_resp
-            checked = ctrl[0].checkbox("✅ Mark as responded", key=cb_key)
-            if checked != is_resp:
-                set_responded(row, checked)
-                st.rerun()
+            # Mark-as-responded checkbox — tracked for all reviews below 5★
+            # (change 1); 5★ reviews don't need a response, so no checkbox.
+            if below5:
+                cb_key = f"resp_{idx}"
+                if cb_key not in st.session_state:
+                    st.session_state[cb_key] = is_resp
+                checked = ctrl[0].checkbox("Mark as responded", key=cb_key)
+                if checked != is_resp:
+                    set_responded(row, checked)
+                    st.rerun()
 
-        # Draft reply with Claude (compact secondary button — styled small via
-        # the st-key-draftbtn_ CSS; no width="stretch" so it stays content-width).
-        reply_key = f"reply_{idx}"
-        if ctrl[1].button(
-            "✍️ Draft reply", key=f"draftbtn_{idx}", disabled=client is None,
-        ):
-            with st.spinner("Drafting reply…"):
-                try:
-                    st.session_state[reply_key] = draft_reply(row.to_dict())
-                except Exception as exc:
-                    st.session_state[reply_key] = f"__error__{exc}"
+            # Draft reply with Claude (compact secondary button — styled small
+            # via the st-key-draftbtn_ CSS).
+            reply_key = f"reply_{idx}"
+            if ctrl[1].button(
+                "✍️ Draft reply", key=f"draftbtn_{idx}", disabled=client is None,
+            ):
+                with st.spinner("Drafting reply…"):
+                    try:
+                        st.session_state[reply_key] = draft_reply(row.to_dict())
+                    except Exception as exc:
+                        st.session_state[reply_key] = f"__error__{exc}"
 
-        if reply_key in st.session_state:
-            val = st.session_state[reply_key]
-            with st.expander("Suggested reply", expanded=True):
-                if val.startswith("__error__"):
-                    st.error(val[len("__error__"):])
-                else:
-                    st.write(val)
-                    st.caption(f"Drafted by {REPLY_MODEL} · review and edit before posting.")
+            # Internal note — saved on change (blur / Ctrl+Enter).
+            note_key = f"note_{idx}"
+            if note_key not in st.session_state:
+                st.session_state[note_key] = existing_note
+            st.text_area(
+                "Internal note", key=note_key, height=68,
+                placeholder="Internal note (visible only here)…",
+                on_change=_save_note_cb, args=(row, note_key),
+            )
+
+            if reply_key in st.session_state:
+                val = st.session_state[reply_key]
+                with st.expander("Suggested reply", expanded=True):
+                    if val.startswith("__error__"):
+                        st.error(val[len("__error__"):])
+                    else:
+                        st.write(val)
+                        st.caption(f"Drafted by {REPLY_MODEL} · review and edit before posting.")
 
 # ===========================================================================
 # TAB 2 — ANALYTICS
@@ -1014,6 +1168,7 @@ else:  # 🧑‍🏫 Guides
             prev_avg = prev["rating"].mean() if len(prev) else float("nan")
             trend = (avg - prev_avg) if pd.notna(prev_avg) else None
             below5 = int((cur["rating"] < 5).sum())
+            below4 = int((cur["rating"] < 4).sum())
             below3 = int((cur["rating"] < 3).sum())
             emoji, _label = health_status(avg, n)
 
@@ -1030,23 +1185,26 @@ else:  # 🧑‍🏫 Guides
                 "_avg": avg,
             })
 
-            # Alert: a guide with 2+ sub-3★ reviews in the selected period.
-            if below3 >= 2:
+            # Alerts use the SAME thresholds/colours as the health table:
+            # 🔴 avg<4.5 → st.error, 🟡 4.5–4.7 → st.warning. A guide with any
+            # review below 4★ also surfaces (as 🟡 if its average is otherwise
+            # healthy), so weak individual reviews aren't hidden by a good mean.
+            low_detail = f" ({below4} review(s) below 4★)" if below4 else ""
+            if emoji == "🔴":
                 guide_alerts.append((
                     "🔴",
-                    f"**{guide}**: {below3} reviews below 3★ in the selected period "
-                    f"(avg {avg:.2f} over {n} reviews).",
+                    f"**{guide}**: average {avg:.2f} over {n} reviews (below 4.5)"
+                    f"{low_detail}.",
                 ))
-            elif avg < 4.5 and n >= 2:
+            elif emoji == "🟡" or below4 > 0:
                 guide_alerts.append((
                     "🟡",
-                    f"**{guide}**: average {avg:.2f} over {n} reviews in the selected "
-                    f"period (below 4.5).",
+                    f"**{guide}**: average {avg:.2f} over {n} reviews{low_detail}.",
                 ))
 
         st.subheader("Guide alerts")
         if not guide_alerts:
-            st.success("✅ No guide alerts — no guide has 2+ sub-3★ reviews this period.")
+            st.success("✅ No guide alerts — every active guide is 🟢 and has no review below 4★.")
         else:
             order = {"🔴": 0, "🟡": 1}
             for level, msg in sorted(guide_alerts, key=lambda a: order[a[0]]):
@@ -1106,14 +1264,22 @@ else:  # 🧑‍🏫 Guides
                 v = st.session_state[AKEY]
                 st.error(v[len("__error__"):]) if v.startswith("__error__") else st.markdown(v)
 
+        # All known guides (from bookings + anything already attributed), for the
+        # manual-reassignment selectbox.
+        known_guides = sorted(
+            g for g in set(load_bookings()["guide"]).union(df["guide"].dropna())
+            if str(g).strip()
+        )
+
         if n_sel == 0:
             st.info("No reviews for this guide in the selected period.")
-        for _, row in gsel.iterrows():
+        for rid, row in gsel.iterrows():
             rating = row["rating"]
             low = pd.notna(rating) and rating < 3
             date_str = row["display_date"].strftime("%d %b %Y")
             name = row["reviewer_name"] or "Anonymous"
             text = row["review_text"] or "<em>(no comment)</em>"
+            method = row.get("match_method") or "—"
             st.markdown(
                 f'<div class="review-card {"low" if low else ""}">'
                 f'<div class="rc-head">'
@@ -1125,3 +1291,18 @@ else:  # 🧑‍🏫 Guides
                 f'</div>',
                 unsafe_allow_html=True,
             )
+
+            # Manual guide reassignment (writes an override that beats matching).
+            cur_guide = row["guide"]
+            opts = ["None"] + known_guides
+            if cur_guide and cur_guide not in opts:
+                opts = ["None", cur_guide] + known_guides
+            default_idx = opts.index(cur_guide) if cur_guide in opts else 0
+            with st.popover("Reassign guide"):
+                st.caption(f"Currently **{cur_guide or 'None'}** (via {method}).")
+                new_guide = st.selectbox(
+                    "Attributed guide", opts, index=default_idx, key=f"ovr_sel_{rid}",
+                )
+                if st.button("Save override", key=f"ovr_save_{rid}"):
+                    save_guide_override(row, new_guide)
+                    st.rerun()

@@ -249,3 +249,58 @@ def attach_guides(reviews: pd.DataFrame, bookings: pd.DataFrame,
     out["guide"] = guides
     out["match_method"] = methods
     return out
+
+
+def _override_key(platform, tour, reviewer, date_str) -> tuple:
+    """Identity tuple matching the dashboard's review key (platform/tour/name/date)."""
+    return (
+        str(platform).strip().lower(),
+        str(tour).strip().lower(),
+        str(reviewer).strip().lower(),
+        str(date_str).strip(),
+    )
+
+
+def apply_overrides(reviews: pd.DataFrame, overrides: pd.DataFrame,
+                    date_col: str = "review_date") -> pd.DataFrame:
+    """Apply manual guide overrides on top of automatic attribution.
+
+    ``overrides`` has columns platform, tour_name, reviewer_name, review_date
+    (string YYYY-MM-DD), guide. A blank guide clears the attribution. Overrides
+    take priority over the automatic match: matched rows get ``guide`` set and
+    ``match_method="manual"`` (or both ``None`` when the guide is cleared).
+    """
+    if reviews is None or reviews.empty or overrides is None or overrides.empty:
+        return reviews
+
+    out = reviews.copy()
+    if "guide" not in out.columns:
+        out["guide"] = None
+    if "match_method" not in out.columns:
+        out["match_method"] = None
+
+    omap = {
+        _override_key(r["platform"], r["tour_name"], r["reviewer_name"], r["review_date"]):
+            str(r["guide"]).strip()
+        for _, r in overrides.iterrows()
+    }
+    if not omap:
+        return out
+
+    dates = pd.to_datetime(out[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
+    guides = list(out["guide"])
+    methods = list(out["match_method"])
+    for i, (platform, tour, reviewer, dstr) in enumerate(
+        zip(out["platform"], out["tour_name"], out["reviewer_name"], dates)
+    ):
+        guide = omap.get(_override_key(platform, tour, reviewer, dstr))
+        if guide is None:                       # no override for this review
+            continue
+        if guide == "":                         # explicit "clear attribution"
+            guides[i], methods[i] = None, None
+        else:
+            guides[i], methods[i] = guide, "manual"
+
+    out["guide"] = guides
+    out["match_method"] = methods
+    return out
