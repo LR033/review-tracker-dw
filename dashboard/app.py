@@ -47,7 +47,17 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from guide_match import apply_overrides, attach_guides
+from guide_match import attach_guides
+
+try:
+    from guide_match import apply_overrides
+except ImportError:
+    # Resilience for Streamlit Cloud: if a stale guide_match.py (one predating
+    # apply_overrides) is ever deployed alongside this app.py, degrade
+    # gracefully — skip manual overrides — instead of crashing the whole
+    # dashboard at import time. The normal path uses the real function.
+    def apply_overrides(reviews, overrides, date_col="review_date"):
+        return reviews
 
 # ---------------------------------------------------------------------------
 # Config
