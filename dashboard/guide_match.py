@@ -42,6 +42,20 @@ from typing import Optional
 import pandas as pd
 from rapidfuzz import fuzz
 
+# Public API (explicit so the exports are unambiguous to importers).
+__all__ = [
+    "attach_guides",
+    "apply_overrides",
+    "match_review",
+    "build_booking_index",
+    "normalize_tour",
+    "normalize_name",
+    "booking_key",
+    "review_key",
+    "NAME_THRESHOLD",
+    "DATE_WINDOW",
+]
+
 DATE_WINDOW = 1       # ± days around the review date for the date fallback
 # Min rapidfuzz token_set_ratio (0–100) for a reviewer↔contact name match.
 # token_set_ratio is token-aware, so abbreviated names ("Sarah M." vs
