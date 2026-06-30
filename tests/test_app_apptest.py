@@ -101,6 +101,16 @@ def test_guides_tab_has_reassign_and_alerts():
     assert at.error or at.warning or at.success
 
 
+def test_guides_kpi_summary_present():
+    at = _run()
+    at.button(key="tabbtn_3").click().run()
+    assert not at.exception, at.exception
+    blob = " ".join(m.value for m in at.markdown)
+    for label in ("Matched reviews", "Weighted avg", "Below 5★", "Below 3★",
+                  "In alert", "Attention"):
+        assert label in blob, f"KPI summary card '{label}' not found in Guides tab"
+
+
 # ---------------------------------------------------------------------------
 # Minimal runner (so it works without pytest)
 # ---------------------------------------------------------------------------

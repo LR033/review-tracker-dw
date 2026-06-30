@@ -825,38 +825,22 @@ if active_tab == "📋 Reviews":
             if existing_note else ""
         )
         card_key = f"revcardlow_{idx}" if needs_reply else f"revcard_{idx}"
+        reply_key = f"reply_{idx}"
         with st.container(key=card_key):
-            st.markdown(
+            # Header row: badge / stars / name / date on the left, the compact
+            # "Draft reply" button on the right (same line).
+            hcol, dcol = st.columns([4, 1], vertical_alignment="center")
+            hcol.markdown(
                 f'<div class="review-card{" low" if needs_reply else ""}" '
                 f'style="background:none;border:none;padding:0;margin:0;">'
                 f'<div class="rc-head">'
                 f'{platform_badge(row["platform"], row["platform_label"])} '
                 f'&nbsp;<span class="rc-stars">{stars(rating)}</span> '
                 f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; {date_str}{badge}</div>'
-                f'<div class="rc-tour">{row["tour_name"]}</div>'
-                f'<div class="rc-text">{text}</div>'
-                f'{note_html}'
                 f'</div>',
                 unsafe_allow_html=True,
             )
-
-            ctrl = st.columns([1, 1, 2])
-
-            # Mark-as-responded checkbox — tracked for all reviews below 5★
-            # (change 1); 5★ reviews don't need a response, so no checkbox.
-            if below5:
-                cb_key = f"resp_{idx}"
-                if cb_key not in st.session_state:
-                    st.session_state[cb_key] = is_resp
-                checked = ctrl[0].checkbox("Mark as responded", key=cb_key)
-                if checked != is_resp:
-                    set_responded(row, checked)
-                    st.rerun()
-
-            # Draft reply with Claude (compact secondary button — styled small
-            # via the st-key-draftbtn_ CSS).
-            reply_key = f"reply_{idx}"
-            if ctrl[1].button(
+            if dcol.button(
                 "✍️ Draft reply", key=f"draftbtn_{idx}", disabled=client is None,
             ):
                 with st.spinner("Drafting reply…"):
@@ -865,15 +849,41 @@ if active_tab == "📋 Reviews":
                     except Exception as exc:
                         st.session_state[reply_key] = f"__error__{exc}"
 
-            # Internal note — saved on change (blur / Ctrl+Enter).
+            # Body: tour, review text, and the saved note (italic) if any.
+            st.markdown(
+                f'<div class="review-card{" low" if needs_reply else ""}" '
+                f'style="background:none;border:none;padding:0;margin:0;">'
+                f'<div class="rc-tour">{row["tour_name"]}</div>'
+                f'<div class="rc-text">{text}</div>'
+                f'{note_html}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+            # Mark-as-responded checkbox — tracked for all reviews below 5★;
+            # 5★ reviews don't need a response, so no checkbox.
+            if below5:
+                cb_key = f"resp_{idx}"
+                if cb_key not in st.session_state:
+                    st.session_state[cb_key] = is_resp
+                checked = st.checkbox("Mark as responded", key=cb_key)
+                if checked != is_resp:
+                    set_responded(row, checked)
+                    st.rerun()
+
+            # Internal note — collapsed expander; saved on change (blur /
+            # Ctrl+Enter). A 📝 label (vs ＋) signals a note is already saved.
             note_key = f"note_{idx}"
             if note_key not in st.session_state:
                 st.session_state[note_key] = existing_note
-            st.text_area(
-                "Internal note", key=note_key, height=68,
-                placeholder="Internal note (visible only here)…",
-                on_change=_save_note_cb, args=(row, note_key),
-            )
+            note_label = "📝 Internal note" if existing_note else "＋ Internal note"
+            with st.expander(note_label, expanded=False):
+                st.text_area(
+                    "Internal note", key=note_key, height=68,
+                    label_visibility="collapsed",
+                    placeholder="Internal note (visible only here)…",
+                    on_change=_save_note_cb, args=(row, note_key),
+                )
 
             if reply_key in st.session_state:
                 val = st.session_state[reply_key]
@@ -1225,6 +1235,26 @@ else:  # 🧑‍🏫 Guides
         if not rows:
             st.info("No guide-matched reviews in the selected period.")
         else:
+            # KPI summary of the health-table columns for the selected period.
+            total_reviews = sum(r["Reviews"] for r in rows)
+            total_b5 = sum(r["Below 5★"] for r in rows)
+            total_b3 = sum(r["Below 3★"] for r in rows)
+            n_red = sum(1 for r in rows if r["_sev"] == 0)
+            n_yellow = sum(1 for r in rows if r["_sev"] == 1)
+            wavg = (sum(r["Avg"] * r["Reviews"] for r in rows) / total_reviews
+                    if total_reviews else float("nan"))
+
+            kc = st.columns(6)
+            kpi_card(kc[0], "Matched reviews", f"{total_reviews:,}",
+                     f"across {len(rows)} guides", PALETTE[1])
+            kpi_card(kc[1], "Weighted avg",
+                     f"{wavg:.2f}" if pd.notna(wavg) else "—",
+                     "by review count", PALETTE[2])
+            kpi_card(kc[2], "Below 5★", f"{total_b5:,}", "all guides", PALETTE[3])
+            kpi_card(kc[3], "Below 3★", f"{total_b3:,}", "all guides", "#E63946")
+            kpi_card(kc[4], "In alert 🔴", f"{n_red}", "avg below 4.5", "#E63946")
+            kpi_card(kc[5], "Attention 🟡", f"{n_yellow}", "avg 4.5–4.7", "#E9C46A")
+
             gh = pd.DataFrame(rows).sort_values(["_sev", "_avg"]).drop(columns=["_sev", "_avg"])
             st.dataframe(gh, width="stretch", hide_index=True)
             st.caption(
