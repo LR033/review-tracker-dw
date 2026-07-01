@@ -786,14 +786,15 @@ if active_tab == "📋 Reviews":
     head = st.columns([3, 1])
     head[0].caption(f"{total:,} reviews in scope · period {period} · {sort_order.lower()}.")
     show_n = head[1].selectbox(
-        "Show", [50, 75, 100, 150], index=0,
+        "Show", [50, 75, 100, 150, "All"], index=0,
         label_visibility="collapsed", key="rev_show_n",
     )
+    feed_shown = feed if show_n == "All" else feed.head(int(show_n))
 
     if total == 0:
         st.info("No reviews match the current filters and period.")
 
-    for idx, row in feed.head(int(show_n)).iterrows():
+    for idx, row in feed_shown.iterrows():
         rating = row["rating"]
         below5 = pd.notna(rating) and rating < 5            # tracked for responses
         needs_reply = pd.notna(rating) and rating <= 3      # 1-3★ urgent (red)
@@ -1311,9 +1312,16 @@ else:  # 🧑‍🏫 Guides
             if str(g).strip()
         )
 
+        # Feed pagination — same [50/75/100/150/All] control as the Reviews tab.
+        g_show_n = st.columns([3, 1])[1].selectbox(
+            "Show", [50, 75, 100, 150, "All"], index=0,
+            label_visibility="collapsed", key="guide_show_n",
+        )
+        gsel_shown = gsel if g_show_n == "All" else gsel.head(int(g_show_n))
+
         if n_sel == 0:
             st.info("No reviews for this guide in the selected period.")
-        for rid, row in gsel.iterrows():
+        for rid, row in gsel_shown.iterrows():
             rating = row["rating"]
             low = pd.notna(rating) and rating < 3
             date_str = row["display_date"].strftime("%d %b %Y")

@@ -48,11 +48,22 @@ def test_app_boots_without_exception():
 
 def test_reviews_count_selectbox():
     at = _run()
-    # A selectbox offering 50/75/100/150, defaulting to 50.
+    # A selectbox offering 50/75/100/150/All, defaulting to 50.
     show = [sb for sb in at.selectbox if [str(o) for o in sb.options] ==
-            ["50", "75", "100", "150"]]
+            ["50", "75", "100", "150", "All"]]
     assert show, f"reviews-count selectbox not found; saw {_selectbox_options(at)}"
     assert str(show[0].value) == "50"
+
+
+def test_reviews_count_all_renders_full_feed():
+    at = _run()
+    at.radio(key="rev_period").set_value("All").run()
+    # Selecting "All" should render every in-scope review, not just the first 150.
+    at.selectbox(key="rev_show_n").set_value("All").run()
+    assert not at.exception, at.exception
+    # Far more note text areas than the old 150 cap (one per rendered card).
+    note_areas = [ta for ta in at.text_area if ta.label == "Internal note"]
+    assert len(note_areas) > 150, f"only {len(note_areas)} cards rendered under 'All'"
 
 
 def test_reviews_widgets_present_with_plain_responded_label():
@@ -93,9 +104,18 @@ def test_guides_tab_has_reassign_and_alerts():
     at = _run()
     at.button(key="tabbtn_3").click().run()
     assert not at.exception, at.exception
+    # Widen the guide period to All so the selected guide definitely has
+    # in-period reviews (and thus renders reassign popovers), regardless of
+    # which guide sorts first or how recent the data is.
+    at.radio(key="guide_period").set_value("All").run()
+    assert not at.exception, at.exception
     # The per-guide feed offers a manual reassignment selectbox.
     has_reassign = any(sb.label == "Attributed guide" for sb in at.selectbox)
     assert has_reassign, "no 'Attributed guide' reassignment selectbox in Guides tab"
+    # The per-guide feed has the same 50/75/100/150/All pagination control.
+    has_show_all = any([str(o) for o in sb.options] == ["50", "75", "100", "150", "All"]
+                       for sb in at.selectbox)
+    assert has_show_all, "Guides feed missing the [50/75/100/150/All] Show selectbox"
     # Alerts panel renders something (error/warning for unhealthy guides, or a
     # success when all clear) — i.e. no crash and the panel exists.
     assert at.error or at.warning or at.success
