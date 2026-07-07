@@ -131,6 +131,39 @@ def test_guides_kpi_summary_present():
         assert label in blob, f"KPI summary card '{label}' not found in Guides tab"
 
 
+def _all_text(at):
+    parts = []
+    for attr in ("markdown", "subheader", "header", "title", "caption"):
+        try:
+            parts += [e.value for e in getattr(at, attr)]
+        except Exception:
+            pass
+    return " ".join(parts)
+
+
+def test_reviews_tab_has_assign_guide():
+    at = _run()
+    at.radio(key="rev_period").set_value("All").run()
+    assert not at.exception, at.exception
+    # The per-review "Assign guide" expander exposes a guide selectbox.
+    has_assign = any(sb.label == "Attributed guide" for sb in at.selectbox)
+    assert has_assign, "no 'Attributed guide' assign selectbox in Reviews tab"
+
+
+def test_claude_analysis_moved_to_tour_health():
+    at = _run()
+    # Analytics (tab 1) should NO LONGER contain the Claude analysis section.
+    at.button(key="tabbtn_1").click().run()
+    assert not at.exception, at.exception
+    assert "Analyze with Claude" not in _all_text(at), \
+        "Analyze with Claude still present in Analytics tab"
+    # Tour Health (tab 2) SHOULD now contain it.
+    at.button(key="tabbtn_2").click().run()
+    assert not at.exception, at.exception
+    assert "Analyze with Claude" in _all_text(at), \
+        "Analyze with Claude missing from Tour Health tab"
+
+
 # ---------------------------------------------------------------------------
 # Minimal runner (so it works without pytest)
 # ---------------------------------------------------------------------------

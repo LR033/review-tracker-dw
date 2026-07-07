@@ -16,19 +16,19 @@ charts themed via st.plotly_chart):
 
   Tab 2 — Analytics
     Period-over-period KPI cards (this period vs the previous equal window),
-    a volume + average-rating chart with weekly/monthly/yearly toggle, the
-    per-platform and rating-distribution charts, and an "Analyze with Claude"
-    section (general + per-tour) that streams a summary of themes, complaints,
-    praised guides, and trends.
+    a volume + average-rating chart with weekly/monthly/yearly toggle, and the
+    per-platform and rating-distribution charts.
 
-  Tab 3 — Health
+  Tab 3 — Tour Health
     A period selector (default 7d) driving an auto-generated alerts panel and a
     per-tour health table: review count, avg rating, trend vs the previous
     equal period, a "Below 3★" count (reviews under 3 stars), response rate,
-    and a 🟢/🟡/🔴 status from the period average.
+    and a 🟢/🟡/🔴 status from the period average. Below the table, an
+    "Analyze with Claude" section (general + per-tour) streams a summary of
+    themes, complaints, praised guides, and trends.
 
 Filters: platform and tour apply globally; the star-rating filter scopes the
-Reviews feed only (so Analytics/Health averages and statuses stay accurate).
+Reviews feed only (so Analytics/Tour Health averages and statuses stay accurate).
 
 The Anthropic API key is read from st.secrets["ANTHROPIC_API_KEY"] and used for
 both reply drafting and analysis (model claude-sonnet-4-6). The dashboard runs
@@ -729,7 +729,7 @@ st.sidebar.caption("Platform & tour apply everywhere; the rating slider scopes t
 if client_err:
     st.sidebar.caption(f"💬 Claude features disabled — {client_err}")
 
-# Base scope (platform + tour) used by Analytics & Health.
+# Base scope (platform + tour) used by Analytics & Tour Health.
 bdf = df[df["platform"].isin(sel_platforms) & df["tour_name"].isin(sel_tours)].copy()
 if bdf.empty:
     st.info("No reviews match the selected platforms/tours.")
@@ -739,7 +739,7 @@ if bdf.empty:
 # on every rerun. We render our own tab bar from st.button (one per tab) and
 # keep the active tab in session_state, so the selection persists across reruns.
 # The active tab is drawn as a primary button and styled distinctly via CSS.
-TAB_LABELS = ["📋 Reviews", "📊 Analytics", "🩺 Health", "🧑‍🏫 Guides"]
+TAB_LABELS = ["📋 Reviews", "📊 Analytics", "🩺 Tour Health", "🧑‍🏫 Guides"]
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = TAB_LABELS[0]
 
@@ -794,6 +794,12 @@ if active_tab == "📋 Reviews":
     if total == 0:
         st.info("No reviews match the current filters and period.")
 
+    # All known guides (bookings + already-attributed), for per-card assignment.
+    known_guides = sorted(
+        g for g in set(load_bookings()["guide"]).union(df["guide"].dropna())
+        if str(g).strip()
+    )
+
     for idx, row in feed_shown.iterrows():
         rating = row["rating"]
         below5 = pd.notna(rating) and rating < 5            # tracked for responses
@@ -828,32 +834,15 @@ if active_tab == "📋 Reviews":
         card_key = f"revcardlow_{idx}" if needs_reply else f"revcard_{idx}"
         reply_key = f"reply_{idx}"
         with st.container(key=card_key):
-            # Header row: badge / stars / name / date on the left, the compact
-            # "Draft reply" button on the right (same line).
-            hcol, dcol = st.columns([4, 1], vertical_alignment="center")
-            hcol.markdown(
+            # Header + body: badge / stars / name / date / status badge, then the
+            # tour, review text, and saved note (italic). No controls up here.
+            st.markdown(
                 f'<div class="review-card{" low" if needs_reply else ""}" '
                 f'style="background:none;border:none;padding:0;margin:0;">'
                 f'<div class="rc-head">'
                 f'{platform_badge(row["platform"], row["platform_label"])} '
                 f'&nbsp;<span class="rc-stars">{stars(rating)}</span> '
                 f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; {date_str}{badge}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-            if dcol.button(
-                "✍️ Draft reply", key=f"draftbtn_{idx}", disabled=client is None,
-            ):
-                with st.spinner("Drafting reply…"):
-                    try:
-                        st.session_state[reply_key] = draft_reply(row.to_dict())
-                    except Exception as exc:
-                        st.session_state[reply_key] = f"__error__{exc}"
-
-            # Body: tour, review text, and the saved note (italic) if any.
-            st.markdown(
-                f'<div class="review-card{" low" if needs_reply else ""}" '
-                f'style="background:none;border:none;padding:0;margin:0;">'
                 f'<div class="rc-tour">{row["tour_name"]}</div>'
                 f'<div class="rc-text">{text}</div>'
                 f'{note_html}'
@@ -886,6 +875,34 @@ if active_tab == "📋 Reviews":
                     on_change=_save_note_cb, args=(row, note_key),
                 )
 
+            # Manual guide assignment — writes an override that beats matching
+            # (same mechanism as the Guides tab's reassignment).
+            cur_guide = row.get("guide")
+            g_opts = ["None"] + known_guides
+            if cur_guide and cur_guide not in g_opts:
+                g_opts = ["None", cur_guide] + known_guides
+            g_default = g_opts.index(cur_guide) if cur_guide in g_opts else 0
+            with st.expander("Assign guide", expanded=False):
+                st.caption(
+                    f"Currently **{cur_guide or 'None'}** "
+                    f"(via {row.get('match_method') or '—'})."
+                )
+                new_guide = st.selectbox(
+                    "Attributed guide", g_opts, index=g_default,
+                    label_visibility="collapsed", key=f"rev_ovr_sel_{idx}",
+                )
+                if st.button("Save assignment", key=f"rev_ovr_save_{idx}"):
+                    save_guide_override(row, new_guide)
+                    st.rerun()
+
+            # Draft reply with Claude — below the note; the generated reply
+            # renders under the button.
+            if st.button("✍️ Draft reply", key=f"draftbtn_{idx}", disabled=client is None):
+                with st.spinner("Drafting reply…"):
+                    try:
+                        st.session_state[reply_key] = draft_reply(row.to_dict())
+                    except Exception as exc:
+                        st.session_state[reply_key] = f"__error__{exc}"
             if reply_key in st.session_state:
                 val = st.session_state[reply_key]
                 with st.expander("Suggested reply", expanded=True):
@@ -1007,59 +1024,11 @@ elif active_tab == "📊 Analytics":
         fig_h.update_layout(height=300, xaxis=dict(title="Rating"), yaxis=dict(title="Reviews"), **CHART_LAYOUT)
         st.plotly_chart(fig_h, config=PLOTLY_CONFIG)
 
-    st.divider()
-
-    # ---- Analyze with Claude -------------------------------------------------
-    st.subheader("🔍 Analyze with Claude")
-    if client_err:
-        st.caption(f"Disabled — {client_err}")
-
-    gen_col, tour_col = st.columns(2)
-
-    with gen_col:
-        st.markdown("**General analysis** — all reviews in the current scope.")
-        GKEY = "analysis_general"
-        if st.button("Analyze all reviews", key="an_general", disabled=client is None):
-            with st.expander("Claude analysis", expanded=True):
-                try:
-                    scope = f"{len(bdf)} reviews across {bdf['platform'].nunique()} platforms"
-                    full = st.write_stream(stream_analysis(build_digest(bdf, scope)))
-                    st.session_state[GKEY] = full
-                except Exception as exc:
-                    st.session_state[GKEY] = f"__error__{exc}"
-                    st.error(str(exc))
-        elif GKEY in st.session_state:
-            with st.expander("Claude analysis", expanded=True):
-                v = st.session_state[GKEY]
-                st.error(v[len("__error__"):]) if v.startswith("__error__") else st.markdown(v)
-
-    with tour_col:
-        st.markdown("**Per-tour analysis** — pick one tour.")
-        tour_choice = st.selectbox(
-            "Tour", sorted(bdf["tour_name"].unique()), key="an_tour_choice"
-        )
-        TKEY = f"analysis_tour::{tour_choice}"
-        if st.button("Analyze this tour", key="an_tour", disabled=client is None):
-            tdf = bdf[bdf["tour_name"] == tour_choice]
-            with st.expander(f"Claude analysis — {tour_choice}", expanded=True):
-                try:
-                    full = st.write_stream(
-                        stream_analysis(build_digest(tdf, f"Tour: {tour_choice} ({len(tdf)} reviews)"))
-                    )
-                    st.session_state[TKEY] = full
-                except Exception as exc:
-                    st.session_state[TKEY] = f"__error__{exc}"
-                    st.error(str(exc))
-        elif TKEY in st.session_state:
-            with st.expander(f"Claude analysis — {tour_choice}", expanded=True):
-                v = st.session_state[TKEY]
-                st.error(v[len("__error__"):]) if v.startswith("__error__") else st.markdown(v)
-
 # ===========================================================================
-# TAB 3 — HEALTH
+# TAB 3 — TOUR HEALTH
 # ===========================================================================
 
-elif active_tab == "🩺 Health":
+elif active_tab == "🩺 Tour Health":
     HEALTH_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "All": None}
     h_period = st.radio(
         "Period", list(HEALTH_PERIODS), index=0, horizontal=True, key="health_period"
@@ -1146,6 +1115,54 @@ elif active_tab == "🩺 Health":
             "“Below 3★” counts every review under 3 stars; trend compares against the "
             "previous equal period."
         )
+
+    st.divider()
+
+    # ---- Analyze with Claude -------------------------------------------------
+    st.subheader("🔍 Analyze with Claude")
+    if client_err:
+        st.caption(f"Disabled — {client_err}")
+
+    gen_col, tour_col = st.columns(2)
+
+    with gen_col:
+        st.markdown("**General analysis** — all reviews in the current scope.")
+        GKEY = "analysis_general"
+        if st.button("Analyze all reviews", key="an_general", disabled=client is None):
+            with st.expander("Claude analysis", expanded=True):
+                try:
+                    scope = f"{len(bdf)} reviews across {bdf['platform'].nunique()} platforms"
+                    full = st.write_stream(stream_analysis(build_digest(bdf, scope)))
+                    st.session_state[GKEY] = full
+                except Exception as exc:
+                    st.session_state[GKEY] = f"__error__{exc}"
+                    st.error(str(exc))
+        elif GKEY in st.session_state:
+            with st.expander("Claude analysis", expanded=True):
+                v = st.session_state[GKEY]
+                st.error(v[len("__error__"):]) if v.startswith("__error__") else st.markdown(v)
+
+    with tour_col:
+        st.markdown("**Per-tour analysis** — pick one tour.")
+        tour_choice = st.selectbox(
+            "Tour", sorted(bdf["tour_name"].unique()), key="an_tour_choice"
+        )
+        TKEY = f"analysis_tour::{tour_choice}"
+        if st.button("Analyze this tour", key="an_tour", disabled=client is None):
+            tdf = bdf[bdf["tour_name"] == tour_choice]
+            with st.expander(f"Claude analysis — {tour_choice}", expanded=True):
+                try:
+                    full = st.write_stream(
+                        stream_analysis(build_digest(tdf, f"Tour: {tour_choice} ({len(tdf)} reviews)"))
+                    )
+                    st.session_state[TKEY] = full
+                except Exception as exc:
+                    st.session_state[TKEY] = f"__error__{exc}"
+                    st.error(str(exc))
+        elif TKEY in st.session_state:
+            with st.expander(f"Claude analysis — {tour_choice}", expanded=True):
+                v = st.session_state[TKEY]
+                st.error(v[len("__error__"):]) if v.startswith("__error__") else st.markdown(v)
 
 # ===========================================================================
 # TAB 4 — GUIDES

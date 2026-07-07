@@ -95,16 +95,17 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   - **Reviews** — quick period buttons (7d/30d/90d/1y/All), sort selector
     (newest / lowest / highest), and the feed. Each card can be marked
     "responded" (persisted to `data/responses.csv`); responded reviews get a
-    green badge, unresponded 1–2★ reviews a red "needs reply" badge. Keeps
-    the per-review "Draft reply with Claude" button.
+    green badge, unresponded 1–2★ reviews a red "needs reply" badge. Per card
+    (below the note): an "Assign guide" expander (writes `guide_overrides.csv`)
+    and a "Draft reply with Claude" button with the generated reply beneath it.
   - **Analytics** — period-over-period KPI cards (this period vs the previous
     equal window), a volume + avg-rating chart with weekly/monthly/yearly
-    toggle, per-platform and rating-distribution charts, and an "Analyze with
-    Claude" section (general + per-tour) that *streams* a themes/complaints/
-    praised-guides/trends summary and caches it in session_state.
-  - **Health** — auto-generated alerts panel + per-tour health table (last
+    toggle, and per-platform and rating-distribution charts.
+  - **Tour Health** — auto-generated alerts panel + per-tour health table (last
     30 days: count, avg, trend vs prior 30d, low-review count, response rate,
-    and a 🟢 ≥4.8 / 🟡 4.5–4.7 / 🔴 <4.5 status).
+    and a 🟢 ≥4.8 / 🟡 4.5–4.7 / 🔴 <4.5 status). Below the table, an "Analyze
+    with Claude" section (general + per-tour) that *streams* a themes/complaints/
+    praised-guides/trends summary and caches it in session_state.
   - **Guides** — guide-level view over reviews attributed via `bookings.csv`.
     Per-guide health table (avg, matched reviews, below-5★/below-3★, trend),
     an alerts panel (guide with 2+ sub-3★ reviews in the period), a per-guide
