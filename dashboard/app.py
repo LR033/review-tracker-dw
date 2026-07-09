@@ -7,8 +7,9 @@ manual sidebar toggle to force light or dark (neutral, translucent card colours;
 charts themed via st.plotly_chart):
 
   Tab 1 — Reviews
-    Quick period buttons (default 7d), a sort selector (newest / lowest /
-    highest), and the per-review feed. Empty reviews show "(no comment)".
+    Quick period buttons (default All, so every platform is visible regardless
+    of scrape freshness), a sort selector (newest / lowest / highest), and the
+    per-review feed. Empty reviews show "(no comment)".
     Reviews below 5★ are part of the response workflow: 1-3★ get a red "needs
     reply" badge, 4★ a yellow "needs attention" badge, and any can be marked
     "responded" (persisted to data/responses.csv → green badge). 5★ reviews
@@ -765,7 +766,12 @@ if active_tab == "📋 Reviews":
     PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "All": None}
 
     c1, c2 = st.columns([2, 1])
-    period = c1.radio("Period", list(PERIOD_DAYS), index=0, horizontal=True, key="rev_period")
+    # Default to "All" (index 4): a short default (e.g. 7d) hides most platforms,
+    # because guruwalk's display_date is its scrape date (always recent) while
+    # getyourguide — 87% of reviews — can't run in CI and goes stale, so its
+    # real-dated reviews fall outside short windows. "All" keeps every platform
+    # visible regardless of scrape freshness; narrow with the period buttons.
+    period = c1.radio("Period", list(PERIOD_DAYS), index=4, horizontal=True, key="rev_period")
     sort_order = c2.selectbox(
         "Sort", ["Newest first", "Lowest rated", "Highest rated"], key="rev_sort"
     )

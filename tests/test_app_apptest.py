@@ -141,6 +141,19 @@ def _all_text(at):
     return " ".join(parts)
 
 
+def test_reviews_default_feed_shows_all_platforms():
+    # Regression: with the default period, the feed must not be dominated by one
+    # platform. getyourguide (the bulk of reviews) uses real review dates and is
+    # stale, so a short default period hid it entirely — leaving only guruwalk
+    # (whose display_date is its scrape date). Render everything and confirm a
+    # non-guruwalk platform badge is present at the default period.
+    at = _run()
+    at.selectbox(key="rev_show_n").set_value("All").run()
+    assert not at.exception, at.exception
+    assert "GetYourGuide" in _all_text(at), \
+        "getyourguide reviews missing from the default-period feed"
+
+
 def test_reviews_tab_has_assign_guide():
     at = _run()
     at.radio(key="rev_period").set_value("All").run()
