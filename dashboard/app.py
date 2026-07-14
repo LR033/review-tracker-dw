@@ -67,6 +67,7 @@ except ImportError:
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 REVIEWS_FILE = DATA_DIR / "reviews.csv"
 BOOKINGS_FILE = DATA_DIR / "bookings.csv"  # TourDash bookings → guide attribution
+TOUR_RATINGS_FILE = DATA_DIR / "tour_ratings.csv"  # official per-platform aggregate ratings
 # Overridable so tests don't write to the real logs.
 RESPONSES_FILE = Path(os.environ.get("DW_RESPONSES_CSV", str(DATA_DIR / "responses.csv")))
 RESPONSES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "responded_at"]
@@ -175,6 +176,25 @@ def load_reviews() -> pd.DataFrame:
     df.loc[month_precision, "display_date"] = scraped[month_precision]
 
     return df.sort_values("display_date", ascending=False).reset_index(drop=True)
+
+
+@st.cache_data(ttl=300)
+def load_tour_ratings() -> pd.DataFrame:
+    """Load data/tour_ratings.csv — each platform's official aggregate rating.
+
+    One row per (platform, tour_name) with the headline star rating that
+    platform publishes on the tour page (out of 5), scraped by
+    scrapers/ratings_scraper.py. Empty frame if the file is absent.
+    """
+    cols = ["platform", "tour_name", "rating", "scraped_at"]
+    if not TOUR_RATINGS_FILE.exists():
+        return pd.DataFrame(columns=cols + ["platform_label"])
+    tr = pd.read_csv(TOUR_RATINGS_FILE, dtype=str).fillna("")
+    tr["rating"] = pd.to_numeric(tr["rating"], errors="coerce")
+    tr["platform_label"] = tr["platform"].map(
+        lambda p: PLATFORMS.get(p, {}).get("label", p.title())
+    )
+    return tr.dropna(subset=["rating"])
 
 
 BOOKINGS_LOOKBACK_MONTHS = 18  # only recent bookings are needed for matching
@@ -1032,33 +1052,40 @@ elif active_tab == "📊 Analytics":
 
     st.divider()
 
-    # Pivot: one row per tour, one column per platform, cells show
-    # "avg (count)". Uses `cur` so it respects the selected comparison period
-    # (plus the global platform/tour filters); the Overall column is the
-    # count-weighted average across platforms (i.e. the mean of every rating for
-    # the tour), and rows sort by it descending.
+    # Pivot: one row per tour, one column per platform, each cell showing that
+    # platform's OFFICIAL published aggregate rating (out of 5) from
+    # data/tour_ratings.csv — not an average recomputed from the reviews we
+    # scrape. Respects the global platform/tour filters; aggregate ratings
+    # aren't time-scoped, so the comparison period doesn't apply here. The
+    # Overall column is the simple average of the available platform ratings,
+    # and rows sort by it descending.
     st.subheader("Ratings by platform per tour")
-    if cur.empty:
-        st.info("No reviews in the selected period for the current filters.")
+    ratings_df = load_tour_ratings()
+    ratings_df = ratings_df[
+        ratings_df["platform"].isin(sel_platforms)
+        & ratings_df["tour_name"].isin(sel_tours)
+    ]
+    if ratings_df.empty:
+        st.info(
+            "No official ratings available for the current filters. Run "
+            "`python scrapers/ratings_scraper.py` to populate "
+            "`data/tour_ratings.csv`."
+        )
     else:
         # Platform columns in the canonical PLATFORMS order, with any extras
         # (unknown platforms) appended alphabetically.
-        present = set(cur["platform_label"])
+        present = set(ratings_df["platform_label"])
         plat_cols = [v["label"] for v in PLATFORMS.values() if v["label"] in present]
         plat_cols += [l for l in sorted(present) if l not in plat_cols]
 
-        def _cell(ratings: pd.Series) -> str:
-            r = ratings.dropna()
-            return f"{r.mean():.1f} ({len(r)})" if len(r) else "-"
-
         pivot_rows = []
-        for tour, tg in cur.groupby("tour_name"):
+        for tour, tg in ratings_df.groupby("tour_name"):
+            by_plat = tg.groupby("platform_label")["rating"].mean()
             row = {"Tour": tour}
             for lbl in plat_cols:
-                row[lbl] = _cell(tg.loc[tg["platform_label"] == lbl, "rating"])
-            overall = tg["rating"].dropna()
-            row["Overall"] = _cell(overall)
-            row["_sort"] = overall.mean() if len(overall) else float("nan")
+                row[lbl] = f"{by_plat[lbl]:.1f}" if lbl in by_plat.index else "-"
+            row["Overall"] = f"{by_plat.mean():.1f}"  # simple avg of available platforms
+            row["_sort"] = by_plat.mean()
             pivot_rows.append(row)
 
         pivot_df = (
@@ -1068,9 +1095,10 @@ elif active_tab == "📊 Analytics":
         )
         st.dataframe(pivot_df, width="stretch", hide_index=True)
         st.caption(
-            f"Each cell is the average rating (review count) for the last {an_period}. "
-            "“Overall” is the count-weighted average across platforms; “-” means the "
-            "tour has no reviews on that platform in the period."
+            "Each platform's official published aggregate rating (out of 5), from "
+            "`data/tour_ratings.csv` (scrapers/ratings_scraper.py). “Overall” is the "
+            "simple average of the available platform ratings; “-” means the tour "
+            "isn't listed on that platform."
         )
 
 # ===========================================================================

@@ -177,6 +177,29 @@ def test_claude_analysis_moved_to_tour_health():
         "Analyze with Claude missing from Tour Health tab"
 
 
+def test_analytics_ratings_by_platform_table():
+    # Analytics tab shows the "Ratings by platform per tour" pivot fed by
+    # data/tour_ratings.csv: one Tour + one Overall column, and cells hold a
+    # single rating (no "(count)" — that was the old review-derived version).
+    at = _run()
+    at.button(key="tabbtn_1").click().run()
+    assert not at.exception, at.exception
+    assert "Ratings by platform per tour" in _all_text(at), \
+        "pivot subheader missing from Analytics tab"
+
+    pivots = [d.value for d in at.dataframe
+              if "Tour" in d.value.columns and "Overall" in d.value.columns]
+    assert pivots, "Ratings-by-platform pivot dataframe not found"
+    pivot = pivots[0]
+    # Every non-Tour cell is either "-" or a bare one-decimal rating like "4.7".
+    import re as _re
+    cell_re = _re.compile(r"^(-|\d(?:\.\d)?)$")
+    for col in [c for c in pivot.columns if c != "Tour"]:
+        for val in pivot[col]:
+            assert cell_re.match(str(val)), \
+                f"unexpected cell '{val}' in column '{col}' (review counts removed?)"
+
+
 # ---------------------------------------------------------------------------
 # Minimal runner (so it works without pytest)
 # ---------------------------------------------------------------------------
