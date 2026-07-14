@@ -1030,6 +1030,49 @@ elif active_tab == "📊 Analytics":
         fig_h.update_layout(height=300, xaxis=dict(title="Rating"), yaxis=dict(title="Reviews"), **CHART_LAYOUT)
         st.plotly_chart(fig_h, config=PLOTLY_CONFIG)
 
+    st.divider()
+
+    # Pivot: one row per tour, one column per platform, cells show
+    # "avg (count)". Uses `cur` so it respects the selected comparison period
+    # (plus the global platform/tour filters); the Overall column is the
+    # count-weighted average across platforms (i.e. the mean of every rating for
+    # the tour), and rows sort by it descending.
+    st.subheader("Ratings by platform per tour")
+    if cur.empty:
+        st.info("No reviews in the selected period for the current filters.")
+    else:
+        # Platform columns in the canonical PLATFORMS order, with any extras
+        # (unknown platforms) appended alphabetically.
+        present = set(cur["platform_label"])
+        plat_cols = [v["label"] for v in PLATFORMS.values() if v["label"] in present]
+        plat_cols += [l for l in sorted(present) if l not in plat_cols]
+
+        def _cell(ratings: pd.Series) -> str:
+            r = ratings.dropna()
+            return f"{r.mean():.1f} ({len(r)})" if len(r) else "-"
+
+        pivot_rows = []
+        for tour, tg in cur.groupby("tour_name"):
+            row = {"Tour": tour}
+            for lbl in plat_cols:
+                row[lbl] = _cell(tg.loc[tg["platform_label"] == lbl, "rating"])
+            overall = tg["rating"].dropna()
+            row["Overall"] = _cell(overall)
+            row["_sort"] = overall.mean() if len(overall) else float("nan")
+            pivot_rows.append(row)
+
+        pivot_df = (
+            pd.DataFrame(pivot_rows)
+            .sort_values("_sort", ascending=False, na_position="last")
+            .drop(columns=["_sort"])
+        )
+        st.dataframe(pivot_df, width="stretch", hide_index=True)
+        st.caption(
+            f"Each cell is the average rating (review count) for the last {an_period}. "
+            "“Overall” is the count-weighted average across platforms; “-” means the "
+            "tour has no reviews on that platform in the period."
+        )
+
 # ===========================================================================
 # TAB 3 — TOUR HEALTH
 # ===========================================================================
