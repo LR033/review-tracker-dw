@@ -229,8 +229,9 @@ def test_analytics_ratings_by_platform_table():
         f"comparison columns missing; saw {list(pivot.columns)}"
 
     import re as _re
-    # Platform + Overall cells: "-" or a two-decimal rating like "4.87".
-    rating_re = _re.compile(r"^(-|\d\.\d{2})$")
+    # Platform + Overall cells: "-" or a platform-published rating shown as-is
+    # (default float repr, 1–2 decimals): "5.0", "4.8", "4.87" — never "4.80".
+    rating_re = _re.compile(r"^(-|\d\.\d{1,2})$")
     compare_cols = {"vs last week", "vs last year"}
     rating_cols = [c for c in pivot.columns if c not in {"Tour"} | compare_cols]
     for col in rating_cols:

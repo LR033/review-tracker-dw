@@ -247,6 +247,17 @@ def fmt_rating_delta(delta) -> str:
     return f"{'▲' if delta > 0 else '▼'}{abs(delta):.2f}"
 
 
+def fmt_platform_rating(x) -> str:
+    """Display a platform-published rating exactly as scraped — no forced 2dp.
+
+    Uses Python's default float repr so trailing precision is preserved as the
+    platform shows it: 4.8 → "4.8", 4.87 → "4.87", 5.0 → "5.0", 4.75 → "4.75".
+    Platform ratings are stored at ≤2 decimals; the round guards the Overall
+    column (a mean) against float-repr noise like "4.7999999999999998".
+    """
+    return str(round(float(x), 2))
+
+
 BOOKINGS_LOOKBACK_MONTHS = 18  # only recent bookings are needed for matching
 
 
@@ -1044,8 +1055,8 @@ elif active_tab == "📊 Analytics":
             by_plat = tg_latest.set_index("platform_label")["rating"]
             row = {"Tour": tour}
             for lbl in plat_cols:
-                row[lbl] = f"{by_plat[lbl]:.2f}" if lbl in by_plat.index else "-"
-            row["Overall"] = f"{by_plat.mean():.2f}"  # simple avg of available platforms
+                row[lbl] = fmt_platform_rating(by_plat[lbl]) if lbl in by_plat.index else "-"
+            row["Overall"] = fmt_platform_rating(by_plat.mean())  # simple avg of available platforms
             tg_hist = ratings_hist[ratings_hist["tour_name"] == tour]
             row["vs last week"] = fmt_rating_delta(tour_rating_delta(tg_hist, now, "week"))
             row["vs last year"] = fmt_rating_delta(tour_rating_delta(tg_hist, now, "year"))
