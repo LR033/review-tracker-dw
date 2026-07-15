@@ -8,13 +8,15 @@ The dashboard's "Ratings by platform per tour" table reads this file so it shows
 each platform's own published rating rather than an average recomputed from the
 subset of reviews we manage to scrape.
 
-Sources (verified against the live sites on 2026-07-14):
+Sources (verified against the live sites on 2026-07-14; GYG re-verified 2026-07-15):
 
-- GetYourGuide: the tour page embeds a schema.org Product with an
-  ``aggregateRating`` (ratingValue on a /5 scale, e.g. 4.82). Tours are
-  enumerated from the Discover Walks supplier page. Cloudflare 403s every
-  headless variant, so this runs *headed* real Chrome (same as
-  getyourguide_scraper.py) and needs a display — not for CI.
+- GetYourGuide: the VISIBLE headline rating shown next to the star icon
+  (e.g. "Top rated ★ 4.8 887 reviews") — one decimal, as users see it. We
+  deliberately avoid the schema.org aggregateRating here: it carries extra
+  precision (4.82) the page never displays. Tours are enumerated from the
+  Discover Walks supplier page. Cloudflare 403s every headless variant, so
+  this runs *headed* real Chrome (same as getyourguide_scraper.py) and needs
+  a display — not for CI.
 
 - Freetour: the tour page embeds a schema.org Product/Event with an
   ``aggregateRating`` on a /10 scale (bestRating 10, e.g. 9.5); we normalise
@@ -110,6 +112,40 @@ async def _jsonld_aggregate(page):
                 best = 5.0
             return round(value / best * 5, 2)
     return None
+
+
+async def _gyg_visible_rating(page):
+    """Return GetYourGuide's VISIBLE headline rating (one decimal), or None.
+
+    GYG shows a rounded one-decimal figure next to the star icon, e.g.
+    "Top rated ★ 4.8 887 reviews". We scrape that text rather than the
+    schema.org aggregateRating, whose extra precision (4.82) users never see.
+    The headline rating sits immediately before the review count, so we match
+    the "X.X  N reviews" cluster; the reviews-summary average ("4.8/5") is a
+    fallback.
+    """
+    val = await page.evaluate(
+        """() => {
+            const rx = /^(\\d(?:\\.\\d)?)\\s+[\\d,]+\\s+reviews/i;
+            for (const el of document.querySelectorAll('span,div,a,strong,p')) {
+                const t = (el.innerText || '').replace(/\\s+/g, ' ').trim();
+                const m = t.match(rx);
+                if (m) return m[1];
+            }
+            const avg = document.querySelector(
+                '.reviews-summary__rating-average, [class*="rating-average"]'
+            );
+            if (avg) {
+                const m = (avg.innerText || '').match(/(\\d(?:\\.\\d)?)/);
+                if (m) return m[1];
+            }
+            return null;
+        }"""
+    )
+    try:
+        return round(float(val), 2) if val is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 async def _guruwalk_aggregate(page):
@@ -222,7 +258,7 @@ async def scrape_getyourguide() -> list:
             try:
                 await retry(lambda: page.goto(url, wait_until="domcontentloaded", timeout=60_000))
                 await page.wait_for_timeout(3_000)
-                rating = await _jsonld_aggregate(page)
+                rating = await _gyg_visible_rating(page)
             except Exception as exc:
                 print(f"  Skipping {title}: {exc}")
                 continue
