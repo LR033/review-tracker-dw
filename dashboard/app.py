@@ -67,7 +67,8 @@ except ImportError:
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 REVIEWS_FILE = DATA_DIR / "reviews.csv"
 BOOKINGS_FILE = DATA_DIR / "bookings.csv"  # TourDash bookings → guide attribution
-TOUR_RATINGS_FILE = DATA_DIR / "tour_ratings.csv"  # official per-platform aggregate ratings
+# Official per-platform aggregate ratings (overridable so tests can supply a fixture).
+TOUR_RATINGS_FILE = Path(os.environ.get("DW_TOUR_RATINGS_CSV", str(DATA_DIR / "tour_ratings.csv")))
 # Overridable so tests don't write to the real logs.
 RESPONSES_FILE = Path(os.environ.get("DW_RESPONSES_CSV", str(DATA_DIR / "responses.csv")))
 RESPONSES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "responded_at"]
@@ -182,19 +183,68 @@ def load_reviews() -> pd.DataFrame:
 def load_tour_ratings() -> pd.DataFrame:
     """Load data/tour_ratings.csv — each platform's official aggregate rating.
 
-    One row per (platform, tour_name) with the headline star rating that
-    platform publishes on the tour page (out of 5), scraped by
-    scrapers/ratings_scraper.py. Empty frame if the file is absent.
+    A time series of (platform, tour_name, rating, scraped_at) readings — one
+    per tour per day the scraper ran (scrapers/ratings_scraper.py). The latest
+    reading per (platform, tour_name) is the current rating; older readings back
+    the week-over-week / year-over-year comparisons. ``scraped_at`` is parsed to
+    a tz-aware UTC timestamp. Empty frame if the file is absent.
     """
     cols = ["platform", "tour_name", "rating", "scraped_at"]
     if not TOUR_RATINGS_FILE.exists():
         return pd.DataFrame(columns=cols + ["platform_label"])
     tr = pd.read_csv(TOUR_RATINGS_FILE, dtype=str).fillna("")
     tr["rating"] = pd.to_numeric(tr["rating"], errors="coerce")
+    tr["scraped_at"] = pd.to_datetime(tr["scraped_at"], errors="coerce", utc=True)
     tr["platform_label"] = tr["platform"].map(
         lambda p: PLATFORMS.get(p, {}).get("label", p.title())
     )
-    return tr.dropna(subset=["rating"])
+    return tr.dropna(subset=["rating", "scraped_at"])
+
+
+def tour_rating_delta(tour_hist: pd.DataFrame, now: pd.Timestamp, mode: str):
+    """Average change in a tour's official rating vs a week / year ago.
+
+    ``tour_hist`` is every reading for one tour (possibly several platforms).
+    For each platform we compare its latest reading to an earlier one and
+    average the per-platform deltas (so the result is robust to which platforms
+    have history). ``mode`` is "week" or "year":
+
+    - week: the most recent reading taken on or before 7 days ago.
+    - year: the reading closest to 365 days ago, considering only readings at
+      least ~6 months old (so a recent reading is never mistaken for a year-ago
+      one).
+
+    Returns the averaged delta (float) or None when no earlier reading exists.
+    """
+    week_cut = now - pd.Timedelta(days=7)
+    year_target = now - pd.Timedelta(days=365)
+    year_max = now - pd.Timedelta(days=183)
+    deltas = []
+    for _, sub in tour_hist.groupby("platform"):
+        sub = sub.sort_values("scraped_at")
+        current = float(sub.iloc[-1]["rating"])
+        if mode == "week":
+            prior = sub[sub["scraped_at"] <= week_cut]
+            if prior.empty:
+                continue
+            prev = float(prior.iloc[-1]["rating"])
+        else:  # year
+            cand = sub[sub["scraped_at"] <= year_max]
+            if cand.empty:
+                continue
+            idx = (cand["scraped_at"] - year_target).abs().idxmin()
+            prev = float(cand.loc[idx, "rating"])
+        deltas.append(current - prev)
+    return sum(deltas) / len(deltas) if deltas else None
+
+
+def fmt_rating_delta(delta) -> str:
+    """Format a rating delta as ▲0.10 / ▼0.10 / — (no data) / 0.00 (no change)."""
+    if delta is None:
+        return "—"
+    if abs(delta) < 0.005:
+        return "0.00"
+    return f"{'▲' if delta > 0 else '▼'}{abs(delta):.2f}"
 
 
 BOOKINGS_LOOKBACK_MONTHS = 18  # only recent bookings are needed for matching
@@ -666,6 +716,19 @@ st.markdown(
         min-height: 0;
     }
 
+    /* "Tag guide" selectbox (keys: rev_ovr_sel_*): shrink to hug the guide
+       name (auto width) instead of stretching full-width, and give the box a
+       more prominent border. Background is left untouched. */
+    div[class*="st-key-rev_ovr_sel_"] {
+        width: max-content !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    div[class*="st-key-rev_ovr_sel_"] div[data-baseweb="select"] > div {
+        border-width: 2px !important;
+        border-color: #5B7A99 !important;
+    }
+
     /* Narrower sidebar — ~75% of the default ~336px (change 5). */
     [data-testid="stSidebar"] {
         width: 252px !important;
@@ -820,7 +883,7 @@ if active_tab == "📋 Reviews":
     if total == 0:
         st.info("No reviews match the current filters and period.")
 
-    # All known guides (bookings + already-attributed), for per-card assignment.
+    # All known guides (bookings + already-attributed), for per-card tagging.
     known_guides = sorted(
         g for g in set(load_bookings()["guide"]).union(df["guide"].dropna())
         if str(g).strip()
@@ -901,14 +964,14 @@ if active_tab == "📋 Reviews":
                     on_change=_save_note_cb, args=(row, note_key),
                 )
 
-            # Manual guide assignment — writes an override that beats matching
+            # Manual guide tag — writes an override that beats matching
             # (same mechanism as the Guides tab's reassignment).
             cur_guide = row.get("guide")
             g_opts = ["None"] + known_guides
             if cur_guide and cur_guide not in g_opts:
                 g_opts = ["None", cur_guide] + known_guides
             g_default = g_opts.index(cur_guide) if cur_guide in g_opts else 0
-            with st.expander("Assign guide", expanded=False):
+            with st.expander("Tag guide", expanded=False):
                 st.caption(
                     f"Currently **{cur_guide or 'None'}** "
                     f"(via {row.get('match_method') or '—'})."
@@ -917,7 +980,7 @@ if active_tab == "📋 Reviews":
                     "Attributed guide", g_opts, index=g_default,
                     label_visibility="collapsed", key=f"rev_ovr_sel_{idx}",
                 )
-                if st.button("Save assignment", key=f"rev_ovr_save_{idx}"):
+                if st.button("Save tag", key=f"rev_ovr_save_{idx}"):
                     save_guide_override(row, new_guide)
                     st.rerun()
 
@@ -943,6 +1006,69 @@ if active_tab == "📋 Reviews":
 # ===========================================================================
 
 elif active_tab == "📊 Analytics":
+    # Official aggregate ratings per platform (data/tour_ratings.csv) — each
+    # platform's own published headline rating, not an average recomputed from
+    # the reviews we scrape. Shown at the top of Analytics. One row per tour,
+    # one column per platform (latest reading), an Overall = simple average of
+    # the available platform ratings, plus week-over-week / year-over-year
+    # change from the scraped history. Respects the global platform/tour filters
+    # (aggregate ratings aren't time-scoped, so the comparison period below
+    # doesn't apply here); rows sort by Overall descending.
+    st.subheader("Ratings by platform per tour")
+    ratings_hist = load_tour_ratings()
+    ratings_hist = ratings_hist[
+        ratings_hist["platform"].isin(sel_platforms)
+        & ratings_hist["tour_name"].isin(sel_tours)
+    ]
+    if ratings_hist.empty:
+        st.info(
+            "No official ratings available for the current filters. Run "
+            "`python scrapers/ratings_scraper.py` to populate "
+            "`data/tour_ratings.csv`."
+        )
+    else:
+        now = pd.Timestamp.now(tz="UTC")
+        # Latest reading per (platform, tour) drives the current-rating cells.
+        latest = (
+            ratings_hist.sort_values("scraped_at")
+            .groupby(["platform", "tour_name"], as_index=False)
+            .last()
+        )
+        # Platform columns in the canonical PLATFORMS order, extras appended.
+        present = set(latest["platform_label"])
+        plat_cols = [v["label"] for v in PLATFORMS.values() if v["label"] in present]
+        plat_cols += [l for l in sorted(present) if l not in plat_cols]
+
+        rating_rows = []
+        for tour, tg_latest in latest.groupby("tour_name"):
+            by_plat = tg_latest.set_index("platform_label")["rating"]
+            row = {"Tour": tour}
+            for lbl in plat_cols:
+                row[lbl] = f"{by_plat[lbl]:.2f}" if lbl in by_plat.index else "-"
+            row["Overall"] = f"{by_plat.mean():.2f}"  # simple avg of available platforms
+            tg_hist = ratings_hist[ratings_hist["tour_name"] == tour]
+            row["vs last week"] = fmt_rating_delta(tour_rating_delta(tg_hist, now, "week"))
+            row["vs last year"] = fmt_rating_delta(tour_rating_delta(tg_hist, now, "year"))
+            row["_sort"] = by_plat.mean()
+            rating_rows.append(row)
+
+        ratings_table = (
+            pd.DataFrame(rating_rows)
+            .sort_values("_sort", ascending=False, na_position="last")
+            .drop(columns=["_sort"])
+        )
+        st.dataframe(ratings_table, width="stretch", hide_index=True)
+        st.caption(
+            "Each platform's official published aggregate rating (out of 5), from "
+            "`data/tour_ratings.csv` (scrapers/ratings_scraper.py). “Overall” is the "
+            "simple average of the available platform ratings; “-” means the tour "
+            "isn't listed on that platform. “vs last week / year” compare the current "
+            "rating to the reading ~7 days / ~1 year ago (— when there's no earlier "
+            "reading yet)."
+        )
+
+    st.divider()
+
     AN_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
     an_period = st.radio(
         "Comparison period", list(AN_PERIODS), index=0, horizontal=True, key="an_period"
@@ -1050,57 +1176,6 @@ elif active_tab == "📊 Analytics":
         fig_h.update_layout(height=300, xaxis=dict(title="Rating"), yaxis=dict(title="Reviews"), **CHART_LAYOUT)
         st.plotly_chart(fig_h, config=PLOTLY_CONFIG)
 
-    st.divider()
-
-    # Pivot: one row per tour, one column per platform, each cell showing that
-    # platform's OFFICIAL published aggregate rating (out of 5) from
-    # data/tour_ratings.csv — not an average recomputed from the reviews we
-    # scrape. Respects the global platform/tour filters; aggregate ratings
-    # aren't time-scoped, so the comparison period doesn't apply here. The
-    # Overall column is the simple average of the available platform ratings,
-    # and rows sort by it descending.
-    st.subheader("Ratings by platform per tour")
-    ratings_df = load_tour_ratings()
-    ratings_df = ratings_df[
-        ratings_df["platform"].isin(sel_platforms)
-        & ratings_df["tour_name"].isin(sel_tours)
-    ]
-    if ratings_df.empty:
-        st.info(
-            "No official ratings available for the current filters. Run "
-            "`python scrapers/ratings_scraper.py` to populate "
-            "`data/tour_ratings.csv`."
-        )
-    else:
-        # Platform columns in the canonical PLATFORMS order, with any extras
-        # (unknown platforms) appended alphabetically.
-        present = set(ratings_df["platform_label"])
-        plat_cols = [v["label"] for v in PLATFORMS.values() if v["label"] in present]
-        plat_cols += [l for l in sorted(present) if l not in plat_cols]
-
-        pivot_rows = []
-        for tour, tg in ratings_df.groupby("tour_name"):
-            by_plat = tg.groupby("platform_label")["rating"].mean()
-            row = {"Tour": tour}
-            for lbl in plat_cols:
-                row[lbl] = f"{by_plat[lbl]:.1f}" if lbl in by_plat.index else "-"
-            row["Overall"] = f"{by_plat.mean():.1f}"  # simple avg of available platforms
-            row["_sort"] = by_plat.mean()
-            pivot_rows.append(row)
-
-        pivot_df = (
-            pd.DataFrame(pivot_rows)
-            .sort_values("_sort", ascending=False, na_position="last")
-            .drop(columns=["_sort"])
-        )
-        st.dataframe(pivot_df, width="stretch", hide_index=True)
-        st.caption(
-            "Each platform's official published aggregate rating (out of 5), from "
-            "`data/tour_ratings.csv` (scrapers/ratings_scraper.py). “Overall” is the "
-            "simple average of the available platform ratings; “-” means the tour "
-            "isn't listed on that platform."
-        )
-
 # ===========================================================================
 # TAB 3 — TOUR HEALTH
 # ===========================================================================
@@ -1142,7 +1217,7 @@ elif active_tab == "🩺 Tour Health":
             "Tour": tour,
             "Platform": label_full,
             "Reviews": n,
-            "Avg": round(avg, 2),
+            "Avg": f"{avg:.2f}",
             "Trend": "—" if trend is None else f"{'▲' if trend >= 0 else '▼'} {abs(trend):.2f}",
             "Below 3★": below3,
             "Response rate": f"{resp_rate*100:.0f}%",
@@ -1291,7 +1366,7 @@ else:  # 🧑‍🏫 Guides
                 "Status": emoji,
                 "Guide": guide,
                 "Reviews": n,
-                "Avg": round(avg, 2),
+                "Avg": f"{avg:.2f}",
                 "Below 5★": below5,
                 "Below 3★": below3,
                 "Trend": "—" if trend is None
@@ -1336,7 +1411,7 @@ else:  # 🧑‍🏫 Guides
             total_b3 = sum(r["Below 3★"] for r in rows)
             n_red = sum(1 for r in rows if r["_sev"] == 0)
             n_yellow = sum(1 for r in rows if r["_sev"] == 1)
-            wavg = (sum(r["Avg"] * r["Reviews"] for r in rows) / total_reviews
+            wavg = (sum(r["_avg"] * r["Reviews"] for r in rows) / total_reviews
                     if total_reviews else float("nan"))
 
             kc = st.columns(6)

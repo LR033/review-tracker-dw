@@ -25,9 +25,10 @@ Sources (verified against the live sites on 2026-07-14):
   company trades as "Charing Cross Tours". Enumerated + scraped headless.
 
 Ratings are normalised to a /5 scale and rounded to 2 decimals. Output is
-upserted by (platform, tour_name): a fresh run replaces a tour's row in place
-and leaves other platforms untouched, so one platform failing never wipes the
-others' last-known ratings.
+appended as dated history and upserted by (platform, tour_name, scrape-date):
+each day's run adds one reading per tour, so the file accumulates a time series
+the dashboard uses for week-over-week and year-over-year comparisons. A single
+platform failing never wipes the others' history.
 
 Run standalone:
     python scrapers/ratings_scraper.py
@@ -239,31 +240,40 @@ async def scrape_getyourguide() -> list:
 # ---------------------------------------------------------------------------
 
 def save_ratings(rows: list) -> int:
-    """Upsert scraped rows into tour_ratings.csv by (platform, tour_name).
+    """Append scraped rows to tour_ratings.csv, keeping one reading per day.
 
-    Existing rows for platforms/tours we didn't scrape are preserved, so a
-    single platform failing never drops the others' last-known ratings.
+    Readings are upserted by (platform, tour_name, scrape-date) so the file
+    accumulates history over time — re-running on the same day overwrites that
+    day's reading, while earlier days are preserved. The dashboard uses this
+    history to compare each tour's current rating against a week ago and a year
+    ago. Rows for platforms/tours we didn't scrape this run are left untouched,
+    so a single platform failing never drops the others' history.
     Returns the number of rows written for this run.
     """
     if not rows:
         return 0
-    scraped_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now = datetime.now(timezone.utc)
+    scraped_at = now.isoformat(timespec="seconds")
+    day = now.date().isoformat()
 
     existing = {}
     if RATINGS_FILE.exists():
         with open(RATINGS_FILE, newline="", encoding="utf-8") as f:
             for r in csv.DictReader(f):
-                existing[(r["platform"], r["tour_name"])] = r
+                existing[(r["platform"], r["tour_name"], (r.get("scraped_at") or "")[:10])] = r
 
     for row in rows:
-        existing[(row["platform"], row["tour_name"])] = {
+        existing[(row["platform"], row["tour_name"], day)] = {
             "platform": row["platform"],
             "tour_name": row["tour_name"],
             "rating": f"{row['rating']:g}",
             "scraped_at": scraped_at,
         }
 
-    ordered = sorted(existing.values(), key=lambda r: (r["platform"], r["tour_name"]))
+    ordered = sorted(
+        existing.values(),
+        key=lambda r: (r["scraped_at"], r["platform"], r["tour_name"]),
+    )
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(RATINGS_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)

@@ -15,9 +15,11 @@ or under pytest:
     pytest tests/test_app_apptest.py
 """
 
+import csv
 import os
 import sys
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +31,38 @@ _TMP = tempfile.mkdtemp(prefix="dw_apptest_")
 os.environ["DW_RESPONSES_CSV"] = str(Path(_TMP) / "responses.csv")
 os.environ["DW_NOTES_CSV"] = str(Path(_TMP) / "notes.csv")
 os.environ["DW_OVERRIDES_CSV"] = str(Path(_TMP) / "guide_overrides.csv")
+
+
+def _build_tour_ratings_fixture() -> str:
+    """Real tour_ratings.csv plus synthetic history so the comparison columns
+    have earlier readings to diff against (the live file only has today's run).
+
+    Returns the fixture path. For the first (platform, tour_name) in the real
+    file we add a reading ~8 days ago and ~370 days ago, both lower than today's
+    rating, so "vs last week" and "vs last year" render an ▲ delta.
+    """
+    real = ROOT / "data" / "tour_ratings.csv"
+    rows = []
+    if real.exists():
+        with open(real, newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+    now = datetime.now(timezone.utc)
+    if rows:
+        first = rows[0]
+        cur = float(first["rating"])
+        for days, rating in ((8, round(cur - 0.15, 2)), (370, round(cur - 0.25, 2))):
+            ts = (now - timedelta(days=days)).isoformat(timespec="seconds")
+            rows.append({"platform": first["platform"], "tour_name": first["tour_name"],
+                         "rating": f"{rating:g}", "scraped_at": ts})
+    path = Path(_TMP) / "tour_ratings.csv"
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["platform", "tour_name", "rating", "scraped_at"])
+        w.writeheader()
+        w.writerows(rows)
+    return str(path)
+
+
+os.environ["DW_TOUR_RATINGS_CSV"] = _build_tour_ratings_fixture()
 
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
@@ -178,9 +212,9 @@ def test_claude_analysis_moved_to_tour_health():
 
 
 def test_analytics_ratings_by_platform_table():
-    # Analytics tab shows the "Ratings by platform per tour" pivot fed by
-    # data/tour_ratings.csv: one Tour + one Overall column, and cells hold a
-    # single rating (no "(count)" — that was the old review-derived version).
+    # Analytics tab shows the "Ratings by platform per tour" table fed by
+    # data/tour_ratings.csv: platform/Overall cells hold a bare two-decimal
+    # rating (no "(count)"), plus week/year comparison columns.
     at = _run()
     at.button(key="tabbtn_1").click().run()
     assert not at.exception, at.exception
@@ -189,15 +223,41 @@ def test_analytics_ratings_by_platform_table():
 
     pivots = [d.value for d in at.dataframe
               if "Tour" in d.value.columns and "Overall" in d.value.columns]
-    assert pivots, "Ratings-by-platform pivot dataframe not found"
+    assert pivots, "Ratings-by-platform table not found"
     pivot = pivots[0]
-    # Every non-Tour cell is either "-" or a bare one-decimal rating like "4.7".
+    assert "vs last week" in pivot.columns and "vs last year" in pivot.columns, \
+        f"comparison columns missing; saw {list(pivot.columns)}"
+
     import re as _re
-    cell_re = _re.compile(r"^(-|\d(?:\.\d)?)$")
-    for col in [c for c in pivot.columns if c != "Tour"]:
+    # Platform + Overall cells: "-" or a two-decimal rating like "4.87".
+    rating_re = _re.compile(r"^(-|\d\.\d{2})$")
+    compare_cols = {"vs last week", "vs last year"}
+    rating_cols = [c for c in pivot.columns if c not in {"Tour"} | compare_cols]
+    for col in rating_cols:
         for val in pivot[col]:
-            assert cell_re.match(str(val)), \
-                f"unexpected cell '{val}' in column '{col}' (review counts removed?)"
+            assert rating_re.match(str(val)), \
+                f"unexpected rating cell '{val}' in column '{col}'"
+    # Comparison cells: — (no data), 0.00 (no change), or ▲/▼ + two decimals.
+    delta_re = _re.compile(r"^(—|0\.00|[▲▼]\d\.\d{2})$")
+    for col in compare_cols:
+        for val in pivot[col]:
+            assert delta_re.match(str(val)), \
+                f"unexpected comparison cell '{val}' in column '{col}'"
+
+
+def test_analytics_rating_comparisons_compute():
+    # The synthetic-history fixture adds a lower reading ~8 days and ~370 days
+    # ago for one tour, so both comparison columns must show an ▲ delta for it
+    # (proving the week/year diff logic runs, not just renders "—").
+    at = _run()
+    at.button(key="tabbtn_1").click().run()
+    assert not at.exception, at.exception
+    pivot = next(d.value for d in at.dataframe
+                 if "vs last week" in d.value.columns)
+    up_week = [v for v in pivot["vs last week"] if str(v).startswith("▲")]
+    up_year = [v for v in pivot["vs last year"] if str(v).startswith("▲")]
+    assert up_week, f"no ▲ 'vs last week' delta computed; saw {list(pivot['vs last week'])}"
+    assert up_year, f"no ▲ 'vs last year' delta computed; saw {list(pivot['vs last year'])}"
 
 
 # ---------------------------------------------------------------------------
