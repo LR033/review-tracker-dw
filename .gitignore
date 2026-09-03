@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .DS_Store
 .streamlit/secrets.toml
+
+# Contains customer PII (contact names); regenerate locally via the TourDash API.
+data/bookings.csv

@@ -1,6 +1,19 @@
 """
 TourDash booking pull for Discover Walks.
 
+NOTE (guides-feature branch): ``data/bookings.csv`` is gitignored and is NOT
+committed to this repo — it contains customer PII (contact names), and the repo
+is public (Streamlit Cloud). It must be regenerated locally by running this
+scraper against the TourDash API before the guide-matching dashboard can attribute
+reviews to guides:
+
+    TOURDASH_API_KEY=... python scrapers/tourdash_scraper.py
+
+This entire guide-matching feature lives ONLY on the ``guides-feature`` branch; it
+was removed from ``main`` because bookings.csv's PII cannot live in a public repo.
+See "Removed: guide matching" in CLAUDE.md on ``main`` for the full rationale and
+restore steps.
+
 Pulls confirmed bookings (those with a check-in guide) from the TourDash API
 into ``data/bookings.csv``. The dashboard uses this file to attribute each
 review to the guide who actually ran the tour.
