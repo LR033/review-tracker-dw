@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .DS_Store
 .streamlit/secrets.toml
+
+# Removed from the repo: contained customer PII (contact names). The guide-
+# matching feature that produced it lives on the guides-feature branch; see
+# "Removed: guide matching" in CLAUDE.md.
+data/bookings.csv

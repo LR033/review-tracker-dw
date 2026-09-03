@@ -48,25 +48,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from guide_match import attach_guides
-
-try:
-    from guide_match import apply_overrides
-except ImportError:
-    # Resilience for Streamlit Cloud: if a stale guide_match.py (one predating
-    # apply_overrides) is ever deployed alongside this app.py, degrade
-    # gracefully — skip manual overrides — instead of crashing the whole
-    # dashboard at import time. The normal path uses the real function.
-    def apply_overrides(reviews, overrides, date_col="review_date"):
-        return reviews
-
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 REVIEWS_FILE = DATA_DIR / "reviews.csv"
-BOOKINGS_FILE = DATA_DIR / "bookings.csv"  # TourDash bookings → guide attribution
 # Official per-platform aggregate ratings (overridable so tests can supply a fixture).
 TOUR_RATINGS_FILE = Path(os.environ.get("DW_TOUR_RATINGS_CSV", str(DATA_DIR / "tour_ratings.csv")))
 # Overridable so tests don't write to the real logs.
@@ -74,8 +61,6 @@ RESPONSES_FILE = Path(os.environ.get("DW_RESPONSES_CSV", str(DATA_DIR / "respons
 RESPONSES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "responded_at"]
 NOTES_FILE = Path(os.environ.get("DW_NOTES_CSV", str(DATA_DIR / "notes.csv")))
 NOTES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "note", "updated_at"]
-OVERRIDES_FILE = Path(os.environ.get("DW_OVERRIDES_CSV", str(DATA_DIR / "guide_overrides.csv")))
-OVERRIDES_COLS = ["platform", "tour_name", "reviewer_name", "review_date", "guide"]
 
 # Both Claude features use Sonnet per the product spec.
 REPLY_MODEL = "claude-sonnet-4-6"
@@ -258,45 +243,6 @@ def fmt_platform_rating(x) -> str:
     return str(round(float(x), 2))
 
 
-BOOKINGS_LOOKBACK_MONTHS = 18  # only recent bookings are needed for matching
-
-
-@st.cache_data(ttl=3600)
-def load_bookings() -> pd.DataFrame:
-    """Load recent TourDash bookings (empty frame if the file is absent).
-
-    Cached for an hour and limited to the last ``BOOKINGS_LOOKBACK_MONTHS`` so
-    the guide-matching lookup stays bounded as bookings.csv grows over time
-    (reviews are recent, so older bookings can't match anything anyway).
-    """
-    cols = ["booking_id", "tour_name", "tour_date", "guide", "contact_name",
-            "platform", "booked_adults", "attended_adults", "status"]
-    if not BOOKINGS_FILE.exists():
-        return pd.DataFrame(columns=cols)
-    bdf = pd.read_csv(BOOKINGS_FILE, dtype=str).fillna("")
-    bdf["tour_date"] = pd.to_datetime(bdf["tour_date"], errors="coerce")
-    bdf = bdf.dropna(subset=["tour_date"])
-    # "Discover Walks" is a company-level booking, not a real guide attribution.
-    bdf = bdf[bdf["guide"].astype(str).str.strip().str.lower() != "discover walks"]
-    cutoff = pd.Timestamp(TODAY) - pd.DateOffset(months=BOOKINGS_LOOKBACK_MONTHS)
-    return bdf[bdf["tour_date"] >= cutoff].reset_index(drop=True)
-
-
-@st.cache_data(ttl=3600)
-def load_reviews_with_guides() -> pd.DataFrame:
-    """Reviews with guide attribution attached.
-
-    Guide matching is the expensive step (fuzzy name matching over thousands of
-    bookings), so it lives here behind an hour-long cache instead of running on
-    every Streamlit rerun. Returns the reviews frame plus `guide` and
-    `match_method` columns.
-    """
-    reviews = load_reviews()
-    if reviews.empty:
-        return reviews
-    return attach_guides(reviews, load_bookings(), date_col="review_date")
-
-
 # ---------------------------------------------------------------------------
 # Response tracking (data/responses.csv)
 # ---------------------------------------------------------------------------
@@ -426,49 +372,6 @@ def save_note(row, note_text: str) -> None:
 def _save_note_cb(row, note_key: str) -> None:
     """on_change callback for a note text_area — persists the edited text."""
     save_note(row, st.session_state.get(note_key, ""))
-
-
-# ---------------------------------------------------------------------------
-# Manual guide overrides (data/guide_overrides.csv)
-# ---------------------------------------------------------------------------
-
-@st.cache_data(ttl=5)
-def load_overrides() -> pd.DataFrame:
-    """Return guide_overrides.csv as a DataFrame (empty if absent)."""
-    if not OVERRIDES_FILE.exists():
-        return pd.DataFrame(columns=OVERRIDES_COLS)
-    try:
-        return pd.read_csv(OVERRIDES_FILE, dtype=str).fillna("")
-    except Exception:
-        return pd.DataFrame(columns=OVERRIDES_COLS)
-
-
-def save_guide_override(row, guide) -> None:
-    """Upsert one review's manual guide override (``None``/"" clears the guide)."""
-    key_fields = (
-        str(row["platform"]), str(row["tour_name"]), str(row["reviewer_name"]),
-        row["review_date"].strftime("%Y-%m-%d"),
-    )
-    target = _norm_key(*key_fields)
-
-    odf = load_overrides()
-    if not odf.empty:
-        keep = odf.apply(
-            lambda r: _norm_key(r["platform"], r["tour_name"],
-                                r["reviewer_name"], r["review_date"]) != target,
-            axis=1,
-        )
-        odf = odf[keep]
-
-    odf = pd.concat([odf, pd.DataFrame([{
-        "platform": key_fields[0], "tour_name": key_fields[1],
-        "reviewer_name": key_fields[2], "review_date": key_fields[3],
-        "guide": "" if guide in (None, "None") else str(guide),
-    }])], ignore_index=True)
-
-    OVERRIDES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    odf.to_csv(OVERRIDES_FILE, index=False)
-    load_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -727,19 +630,6 @@ st.markdown(
         min-height: 0;
     }
 
-    /* "Tag guide" selectbox (keys: rev_ovr_sel_*): shrink to hug the guide
-       name (auto width) instead of stretching full-width, and give the box a
-       more prominent border. Background is left untouched. */
-    div[class*="st-key-rev_ovr_sel_"] {
-        width: max-content !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-    }
-    div[class*="st-key-rev_ovr_sel_"] div[data-baseweb="select"] > div {
-        border-width: 2px !important;
-        border-color: #5B7A99 !important;
-    }
-
     /* Narrower sidebar — ~75% of the default ~336px (change 5). */
     [data-testid="stSidebar"] {
         width: 252px !important;
@@ -766,12 +656,7 @@ CHART_LAYOUT = dict(margin=dict(l=0, r=10, t=30, b=0))
 # container width (use_container_width=True), so no width kwarg is needed.
 PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 
-# Reviews + guide attribution, both behind caches (the fuzzy matching is too
-# slow to run on every rerun — see load_reviews_with_guides).
-df = load_reviews_with_guides()
-# Manual overrides are cheap and applied fresh each rerun, so a saved
-# reassignment shows immediately (they take priority over auto-matching).
-df = apply_overrides(df, load_overrides())
+df = load_reviews()
 responded = load_responses()
 notes = load_notes()
 
@@ -834,7 +719,7 @@ if bdf.empty:
 # on every rerun. We render our own tab bar from st.button (one per tab) and
 # keep the active tab in session_state, so the selection persists across reruns.
 # The active tab is drawn as a primary button and styled distinctly via CSS.
-TAB_LABELS = ["📋 Reviews", "📊 Analytics", "🩺 Tour Health", "🧑‍🏫 Guides"]
+TAB_LABELS = ["📋 Reviews", "📊 Analytics", "🩺 Tour Health"]
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = TAB_LABELS[0]
 
@@ -893,12 +778,6 @@ if active_tab == "📋 Reviews":
 
     if total == 0:
         st.info("No reviews match the current filters and period.")
-
-    # All known guides (bookings + already-attributed), for per-card tagging.
-    known_guides = sorted(
-        g for g in set(load_bookings()["guide"]).union(df["guide"].dropna())
-        if str(g).strip()
-    )
 
     for idx, row in feed_shown.iterrows():
         rating = row["rating"]
@@ -974,26 +853,6 @@ if active_tab == "📋 Reviews":
                     placeholder="Internal note (visible only here)…",
                     on_change=_save_note_cb, args=(row, note_key),
                 )
-
-            # Manual guide tag — writes an override that beats matching
-            # (same mechanism as the Guides tab's reassignment).
-            cur_guide = row.get("guide")
-            g_opts = ["None"] + known_guides
-            if cur_guide and cur_guide not in g_opts:
-                g_opts = ["None", cur_guide] + known_guides
-            g_default = g_opts.index(cur_guide) if cur_guide in g_opts else 0
-            with st.expander("Tag guide", expanded=False):
-                st.caption(
-                    f"Currently **{cur_guide or 'None'}** "
-                    f"(via {row.get('match_method') or '—'})."
-                )
-                new_guide = st.selectbox(
-                    "Attributed guide", g_opts, index=g_default,
-                    label_visibility="collapsed", key=f"rev_ovr_sel_{idx}",
-                )
-                if st.button("Save tag", key=f"rev_ovr_save_{idx}"):
-                    save_guide_override(row, new_guide)
-                    st.rerun()
 
             # Draft reply with Claude — below the note; the generated reply
             # renders under the button.
@@ -1326,211 +1185,3 @@ elif active_tab == "🩺 Tour Health":
             with st.expander(f"Claude analysis — {tour_choice}", expanded=True):
                 v = st.session_state[TKEY]
                 st.error(v[len("__error__"):]) if v.startswith("__error__") else st.markdown(v)
-
-# ===========================================================================
-# TAB 4 — GUIDES
-# ===========================================================================
-
-else:  # 🧑‍🏫 Guides
-    GUIDE_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "All": None}
-    g_period = st.radio(
-        "Period", list(GUIDE_PERIODS), index=2, horizontal=True, key="guide_period"
-    )
-    g_days = GUIDE_PERIODS[g_period]
-
-    # Only reviews that matched a guide (via TourDash bookings) are in scope here.
-    gdf = bdf[bdf["guide"].notna() & (bdf["guide"].astype(str) != "")].copy()
-
-    if gdf.empty:
-        st.info(
-            "No reviews are matched to a guide yet. Guides come from "
-            "`data/bookings.csv` (the TourDash pull); a review is attributed when "
-            "its tour name fuzzy-matches a booking within ±1 day. Run "
-            "`scrapers/tourdash_scraper.py` and check the date overlap if this "
-            "stays empty."
-        )
-    else:
-        def _cur_prev_g(g):
-            """Current and previous equal-length windows for the selected period."""
-            if g_days is None:                       # "All" → no previous window
-                return g, g.iloc[0:0]
-            return window(g, g_days, 0), window(g, g_days, g_days)
-
-        # Per-guide stats over the selected period (vs the prior equal period).
-        rows = []
-        guide_alerts = []
-        for guide, g in gdf.groupby("guide"):
-            cur, prev = _cur_prev_g(g)
-            n = len(cur)
-            if n == 0:
-                continue  # only guides active in the selected period
-
-            avg = cur["rating"].mean()
-            prev_avg = prev["rating"].mean() if len(prev) else float("nan")
-            trend = (avg - prev_avg) if pd.notna(prev_avg) else None
-            below5 = int((cur["rating"] < 5).sum())
-            below4 = int((cur["rating"] < 4).sum())
-            below3 = int((cur["rating"] < 3).sum())
-            emoji, _label = health_status(avg, n)
-
-            rows.append({
-                "Status": emoji,
-                "Guide": guide,
-                "Reviews": n,
-                "Avg": f"{avg:.2f}",
-                "Below 5★": below5,
-                "Below 3★": below3,
-                "Trend": "—" if trend is None
-                         else f"{'▲' if trend >= 0 else '▼'} {abs(trend):.2f}",
-                "_sev": 0 if emoji == "🔴" else 1 if emoji == "🟡" else 2,
-                "_avg": avg,
-            })
-
-            # Alerts use the SAME thresholds/colours as the health table:
-            # 🔴 avg<4.5 → st.error, 🟡 4.5–4.7 → st.warning. A guide with any
-            # review below 4★ also surfaces (as 🟡 if its average is otherwise
-            # healthy), so weak individual reviews aren't hidden by a good mean.
-            low_detail = f" ({below4} review(s) below 4★)" if below4 else ""
-            if emoji == "🔴":
-                guide_alerts.append((
-                    "🔴",
-                    f"**{guide}**: average {avg:.2f} over {n} reviews (below 4.5)"
-                    f"{low_detail}.",
-                ))
-            elif emoji == "🟡" or below4 > 0:
-                guide_alerts.append((
-                    "🟡",
-                    f"**{guide}**: average {avg:.2f} over {n} reviews{low_detail}.",
-                ))
-
-        st.subheader("Guide alerts")
-        if not guide_alerts:
-            st.success("✅ No guide alerts — every active guide is 🟢 and has no review below 4★.")
-        else:
-            order = {"🔴": 0, "🟡": 1}
-            for level, msg in sorted(guide_alerts, key=lambda a: order[a[0]]):
-                {"🔴": st.error, "🟡": st.warning}[level](f"{level} {msg}")
-
-        period_label = "all time" if g_days is None else f"last {g_period}"
-        st.subheader(f"Guide health — {period_label}")
-        if not rows:
-            st.info("No guide-matched reviews in the selected period.")
-        else:
-            # KPI summary of the health-table columns for the selected period.
-            total_reviews = sum(r["Reviews"] for r in rows)
-            total_b5 = sum(r["Below 5★"] for r in rows)
-            total_b3 = sum(r["Below 3★"] for r in rows)
-            n_red = sum(1 for r in rows if r["_sev"] == 0)
-            n_yellow = sum(1 for r in rows if r["_sev"] == 1)
-            wavg = (sum(r["_avg"] * r["Reviews"] for r in rows) / total_reviews
-                    if total_reviews else float("nan"))
-
-            kc = st.columns(6)
-            kpi_card(kc[0], "Matched reviews", f"{total_reviews:,}",
-                     f"across {len(rows)} guides", PALETTE[1])
-            kpi_card(kc[1], "Weighted avg",
-                     f"{wavg:.2f}" if pd.notna(wavg) else "—",
-                     "by review count", PALETTE[2])
-            kpi_card(kc[2], "Below 5★", f"{total_b5:,}", "all guides", PALETTE[3])
-            kpi_card(kc[3], "Below 3★", f"{total_b3:,}", "all guides", "#E63946")
-            kpi_card(kc[4], "In alert 🔴", f"{n_red}", "avg below 4.5", "#E63946")
-            kpi_card(kc[5], "Attention 🟡", f"{n_yellow}", "avg 4.5–4.7", "#E9C46A")
-
-            gh = pd.DataFrame(rows).sort_values(["_sev", "_avg"]).drop(columns=["_sev", "_avg"])
-            st.dataframe(gh, width="stretch", hide_index=True)
-            st.caption(
-                "One row per guide with reviews in the period. Status from the period "
-                "average: 🟢 4.8–5.0 · 🟡 4.5–4.7 · 🔴 below 4.5. Trend compares against "
-                "the previous equal period."
-            )
-
-        st.divider()
-
-        # ---- Per-guide review feed + Claude analysis ------------------------
-        st.subheader("Per-guide reviews")
-        guide_names = sorted(gdf["guide"].unique())
-        sel_guide = st.selectbox("Guide", guide_names, key="guide_feed_select")
-
-        gsel = gdf[gdf["guide"] == sel_guide]
-        if g_days is not None:
-            gsel = gsel[gsel["display_date"].dt.date > (TODAY - timedelta(days=g_days))]
-        gsel = gsel.sort_values("display_date", ascending=False)
-
-        n_sel = len(gsel)
-        avg_sel = gsel["rating"].mean() if n_sel else float("nan")
-        st.caption(
-            f"{n_sel} matched review(s) for **{sel_guide}** · period {g_period}"
-            + (f" · avg {avg_sel:.2f}" if pd.notna(avg_sel) else "")
-        )
-
-        # Analyze this guide with Claude (recurring complaints / praise / patterns).
-        AKEY = f"analysis_guide::{sel_guide}"
-        if st.button("🔍 Analyze this guide", key="guide_analyze", disabled=client is None):
-            with st.expander(f"Claude analysis — {sel_guide}", expanded=True):
-                try:
-                    content = (
-                        "You are analysing the reviews for a single Discover Walks tour "
-                        f"guide, {sel_guide}. Identify recurring complaints, recurring "
-                        "praise, and behavioural patterns specific to this guide, and "
-                        "flag anything that needs a manager's attention.\n\n"
-                        + build_digest(gsel, f"Guide {sel_guide} ({n_sel} reviews)")
-                    )
-                    full = st.write_stream(stream_analysis(content))
-                    st.session_state[AKEY] = full
-                except Exception as exc:
-                    st.session_state[AKEY] = f"__error__{exc}"
-                    st.error(str(exc))
-        elif AKEY in st.session_state:
-            with st.expander(f"Claude analysis — {sel_guide}", expanded=True):
-                v = st.session_state[AKEY]
-                st.error(v[len("__error__"):]) if v.startswith("__error__") else st.markdown(v)
-
-        # All known guides (from bookings + anything already attributed), for the
-        # manual-reassignment selectbox.
-        known_guides = sorted(
-            g for g in set(load_bookings()["guide"]).union(df["guide"].dropna())
-            if str(g).strip()
-        )
-
-        # Feed pagination — same [50/75/100/150/All] control as the Reviews tab.
-        g_show_n = st.columns([3, 1])[1].selectbox(
-            "Show", [50, 75, 100, 150, "All"], index=0,
-            label_visibility="collapsed", key="guide_show_n",
-        )
-        gsel_shown = gsel if g_show_n == "All" else gsel.head(int(g_show_n))
-
-        if n_sel == 0:
-            st.info("No reviews for this guide in the selected period.")
-        for rid, row in gsel_shown.iterrows():
-            rating = row["rating"]
-            low = pd.notna(rating) and rating < 3
-            date_str = row["display_date"].strftime("%d %b %Y")
-            name = row["reviewer_name"] or "Anonymous"
-            text = row["review_text"] or "<em>(no comment)</em>"
-            method = row.get("match_method") or "—"
-            st.markdown(
-                f'<div class="review-card {"low" if low else ""}">'
-                f'<div class="rc-head">'
-                f'{platform_badge(row["platform"], row["platform_label"])} '
-                f'&nbsp;<span class="rc-stars">{stars(rating)}</span> '
-                f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; {date_str}</div>'
-                f'<div class="rc-tour">{row["tour_name"]}</div>'
-                f'<div class="rc-text">{text}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-            # Manual guide reassignment (writes an override that beats matching).
-            cur_guide = row["guide"]
-            opts = ["None"] + known_guides
-            if cur_guide and cur_guide not in opts:
-                opts = ["None", cur_guide] + known_guides
-            default_idx = opts.index(cur_guide) if cur_guide in opts else 0
-            with st.popover("Reassign guide"):
-                st.caption(f"Currently **{cur_guide or 'None'}** (via {method}).")
-                new_guide = st.selectbox(
-                    "Attributed guide", opts, index=default_idx, key=f"ovr_sel_{rid}",
-                )
-                if st.button("Save override", key=f"ovr_save_{rid}"):
-                    save_guide_override(row, new_guide)
-                    st.rerun()

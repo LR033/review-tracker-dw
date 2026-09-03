@@ -17,23 +17,6 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   Each inserts its own dir into `sys.path` so `import base_scraper` works.
 - `data/reviews.csv` — append-only. Schema: platform, tour_name, rating,
   reviewer_name, review_text, review_date, url, scraped_at.
-- `data/bookings.csv` — TourDash booking pull (rewritten in full each run by
-  `scrapers/tourdash_scraper.py`). Schema: booking_id, tour_name, tour_date,
-  guide, contact_name, platform, booked_adults, attended_adults, status. Only
-  bookings with a check-in guide that aren't cancelled are kept. The dashboard
-  uses it to attribute reviews to guides (`dashboard/guide_match.py`):
-  **primary** = fuzzy match of review `reviewer_name` ↔ booking `contact_name`
-  (accent-folded, rapidfuzz `token_set_ratio` ≥75, scoped to the same tour);
-  **fallback** =
-  tour+date (±1 day) but only when exactly one guide ran that tour (ambiguous
-  multi-guide days are left unmatched, not guessed). Adds `guide` and
-  `match_method` (`name`/`date_unambiguous`/`manual`/None) columns to the
-  reviews frame. `load_bookings()` drops `guide == "Discover Walks"` (a
-  company-level placeholder, not a real guide) and is limited to the last 18
-  months. Source key: `TOURDASH_API_KEY` (env for the scraper; `st.secrets` for
-  the dashboard; a GitHub Actions secret for CI). This is a REST pull of the
-  company's *own* booking system, not a review aggregator — the no-paid-API
-  rule covers review *collection* only.
 - `data/responses.csv` — written by the dashboard when a review is marked
   "responded". Schema: platform, tour_name, reviewer_name, review_date,
   responded_at. Keyed on the same `(platform, tour_name, reviewer_name,
@@ -42,11 +25,6 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
 - `data/notes.csv` — per-review internal notes from the dashboard. Schema:
   platform, tour_name, reviewer_name, review_date, note, updated_at. Same key
   tuple; path overridable via `DW_NOTES_CSV`.
-- `data/guide_overrides.csv` — manual guide reassignments from the Guides tab.
-  Schema: platform, tour_name, reviewer_name, review_date, guide (blank = clear
-  attribution). `guide_match.apply_overrides()` applies these on top of the
-  automatic match (sets `match_method="manual"`); they take priority. Path
-  overridable via `DW_OVERRIDES_CSV`.
 - `dashboard/app.py` — Streamlit dashboard (3 tabs; see Status).
 - `.github/workflows/scrape.yml` — daily cron; only runs implemented
   scrapers; add new ones to its "Run scrapers" step.
@@ -86,18 +64,15 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
   (403 + empty body, headless AND headed, stealth args insufficient;
   DataDome tier). See the stub docstring for options (owner export from
   TA Management Center is the recommended path).
-- ✅ `tourdash_scraper.py` implemented. REST pull (not Playwright) of TourDash
-  bookings → `data/bookings.csv`; rate-limited (~1 req/3.1s under the 20/60s
-  cap), paginated via `pagination.total_pages`. CI-capable; runs in `scrape.yml`.
 - ✅ `dashboard/app.py` implemented. Streamlit, dark theme + Plotly
   (matches `~/freetour-tracker/dashboard.py` style; theme in
-  `.streamlit/config.toml`). Four tabs:
+  `.streamlit/config.toml`). Three tabs:
   - **Reviews** — quick period buttons (7d/30d/90d/1y/All), sort selector
     (newest / lowest / highest), and the feed. Each card can be marked
     "responded" (persisted to `data/responses.csv`); responded reviews get a
     green badge, unresponded 1–2★ reviews a red "needs reply" badge. Per card
-    (below the note): an "Assign guide" expander (writes `guide_overrides.csv`)
-    and a "Draft reply with Claude" button with the generated reply beneath it.
+    (below the note): a "Draft reply with Claude" button with the generated
+    reply beneath it.
   - **Analytics** — period-over-period KPI cards (this period vs the previous
     equal window), a volume + avg-rating chart with weekly/monthly/yearly
     toggle, and per-platform and rating-distribution charts.
@@ -106,17 +81,49 @@ reviews from 6 platforms into `data/reviews.csv`, visualized via Streamlit.
     and a 🟢 ≥4.8 / 🟡 4.5–4.7 / 🔴 <4.5 status). Below the table, an "Analyze
     with Claude" section (general + per-tour) that *streams* a themes/complaints/
     praised-guides/trends summary and caches it in session_state.
-  - **Guides** — guide-level view over reviews attributed via `bookings.csv`.
-    Per-guide health table (avg, matched reviews, below-5★/below-3★, trend),
-    an alerts panel (guide with 2+ sub-3★ reviews in the period), a per-guide
-    review feed, and an "Analyze this guide" Claude button (recurring
-    complaints / praise / patterns). Shows an info note when no reviews match.
   Filters: platform + tour are global; the star-rating slider scopes the
   Reviews feed only. Both Claude features use `claude-sonnet-4-6` with the key
   from `st.secrets["ANTHROPIC_API_KEY"]`, and degrade gracefully (disabled
   with a hint) when it's absent. Run: `streamlit run dashboard/app.py`.
 - 🔲 Remaining scrapers are docstring stubs. Each stub's docstring records
   platform-specific gotchas (bot protection, lazy loading, consent walls).
+
+## Removed: guide matching (see `guides-feature` branch)
+
+The dashboard used to have a fourth **Guides** tab that attributed each review to
+the guide who ran the tour, with per-guide health tables, alerts, a review feed,
+and an "Analyze this guide" Claude summary.
+
+**What it did.** `scrapers/tourdash_scraper.py` pulled the company's TourDash
+bookings into `data/bookings.csv` (schema: booking_id, tour_name, tour_date,
+guide, contact_name, platform, booked/attended adults, status).
+`dashboard/guide_match.py` attributed reviews to guides — **primary:** fuzzy match
+of review `reviewer_name` ↔ booking `contact_name` (accent-folded, rapidfuzz
+`token_set_ratio` ≥75, scoped to the tour); **fallback:** tour + date (±1 day)
+when exactly one guide ran that tour. Manual corrections were written to
+`data/guide_overrides.csv` (`apply_overrides`, `match_method="manual"`), editable
+from both the Guides tab and a per-card "Tag guide" control on Reviews. The daily
+`scrape.yml` ran the TourDash pull (`TOURDASH_API_KEY` secret).
+
+**Why it was removed.** `data/bookings.csv` contains customer PII (contact names).
+The repo has to be **public** for Streamlit Cloud, so the file — and its entire git
+history — was purged with `git filter-repo`. Keeping the feature would have exposed
+customer data.
+
+**What's preserved.** The full feature (all code, tests, CI wiring) lives on the
+`guides-feature` branch. `bookings.csv` was purged from that branch's history too,
+so no PII sits anywhere on origin; that branch's `tourdash_scraper.py` docstring
+explains how to regenerate the file locally.
+
+**How to restore it.**
+1. **Make the repo private first** — the feature depends on `bookings.csv` (PII),
+   which cannot live in a public repo.
+2. Merge `guides-feature` into `main`.
+3. Regenerate the data locally:
+   `TOURDASH_API_KEY=... python scrapers/tourdash_scraper.py` (writes
+   `data/bookings.csv`, which stays gitignored). Re-add the `TOURDASH_API_KEY`
+   GitHub Actions secret if CI should keep it fresh.
+4. Re-add `rapidfuzz` to `requirements.txt` (removed with the feature).
 
 ## Conventions
 

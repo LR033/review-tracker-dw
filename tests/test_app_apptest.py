@@ -3,10 +3,9 @@ Streamlit AppTest smoke/behaviour checks for dashboard/app.py.
 
 Verifies the app boots and each tab renders without raising, plus the specific
 UI changes: the reviews-count selectbox (50/75/100/150), the plain
-"Mark as responded" label, the per-review internal-note text area, and the
-Guides tab (alerts + reassign popover).
+"Mark as responded" label, and the per-review internal-note text area.
 
-Notes/responses/overrides are redirected to a temp dir via the DW_*_CSV env
+Notes/responses are redirected to a temp dir via the DW_*_CSV env
 vars so the test never touches the real data files.
 
 Run directly (no pytest needed):
@@ -24,13 +23,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = str(ROOT / "dashboard" / "app.py")
-sys.path.insert(0, str(ROOT / "dashboard"))  # so `import guide_match` resolves
+sys.path.insert(0, str(ROOT / "dashboard"))  # so the app's local imports resolve
 
 # Redirect dashboard-written CSVs to a temp dir BEFORE the app module runs.
 _TMP = tempfile.mkdtemp(prefix="dw_apptest_")
 os.environ["DW_RESPONSES_CSV"] = str(Path(_TMP) / "responses.csv")
 os.environ["DW_NOTES_CSV"] = str(Path(_TMP) / "notes.csv")
-os.environ["DW_OVERRIDES_CSV"] = str(Path(_TMP) / "guide_overrides.csv")
 
 
 def _build_tour_ratings_fixture() -> str:
@@ -129,40 +127,18 @@ def test_internal_note_saves_and_persists():
 
 def test_all_tabs_render_without_exception():
     at = _run()
-    for tab_idx in range(4):  # Reviews, Analytics, Health, Guides
+    for tab_idx in range(3):  # Reviews, Analytics, Tour Health
         at.button(key=f"tabbtn_{tab_idx}").click().run()
         assert not at.exception, f"tab {tab_idx} raised: {at.exception}"
 
 
-def test_guides_tab_has_reassign_and_alerts():
+def test_only_three_tabs_present():
+    # The Guides tab was removed (its data source, bookings.csv, held customer
+    # PII and can't live in the public repo). Exactly three tab buttons remain.
     at = _run()
-    at.button(key="tabbtn_3").click().run()
-    assert not at.exception, at.exception
-    # Widen the guide period to All so the selected guide definitely has
-    # in-period reviews (and thus renders reassign popovers), regardless of
-    # which guide sorts first or how recent the data is.
-    at.radio(key="guide_period").set_value("All").run()
-    assert not at.exception, at.exception
-    # The per-guide feed offers a manual reassignment selectbox.
-    has_reassign = any(sb.label == "Attributed guide" for sb in at.selectbox)
-    assert has_reassign, "no 'Attributed guide' reassignment selectbox in Guides tab"
-    # The per-guide feed has the same 50/75/100/150/All pagination control.
-    has_show_all = any([str(o) for o in sb.options] == ["50", "75", "100", "150", "All"]
-                       for sb in at.selectbox)
-    assert has_show_all, "Guides feed missing the [50/75/100/150/All] Show selectbox"
-    # Alerts panel renders something (error/warning for unhealthy guides, or a
-    # success when all clear) — i.e. no crash and the panel exists.
-    assert at.error or at.warning or at.success
-
-
-def test_guides_kpi_summary_present():
-    at = _run()
-    at.button(key="tabbtn_3").click().run()
-    assert not at.exception, at.exception
-    blob = " ".join(m.value for m in at.markdown)
-    for label in ("Matched reviews", "Weighted avg", "Below 5★", "Below 3★",
-                  "In alert", "Attention"):
-        assert label in blob, f"KPI summary card '{label}' not found in Guides tab"
+    tab_btns = [b for b in at.button if b.key and b.key.startswith("tabbtn_")]
+    assert len(tab_btns) == 3, f"expected 3 tabs, found {len(tab_btns)}"
+    assert not any(b.key == "tabbtn_3" for b in tab_btns), "a 4th (Guides) tab is still present"
 
 
 def _all_text(at):
@@ -186,15 +162,6 @@ def test_reviews_default_feed_shows_all_platforms():
     assert not at.exception, at.exception
     assert "GetYourGuide" in _all_text(at), \
         "getyourguide reviews missing from the default-period feed"
-
-
-def test_reviews_tab_has_assign_guide():
-    at = _run()
-    at.radio(key="rev_period").set_value("All").run()
-    assert not at.exception, at.exception
-    # The per-review "Assign guide" expander exposes a guide selectbox.
-    has_assign = any(sb.label == "Attributed guide" for sb in at.selectbox)
-    assert has_assign, "no 'Attributed guide' assign selectbox in Reviews tab"
 
 
 def test_claude_analysis_moved_to_tour_health():
