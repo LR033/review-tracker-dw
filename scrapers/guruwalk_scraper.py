@@ -9,25 +9,36 @@ Strategy:
    clicking "Load more" until results stop growing (selectors proven by
    the rankings tracker).
 2. Visit each tour page and parse the review carousel inside
-   [data-testid='reviews'] (verified against the live site on 2026-06-10):
+   [data-testid='reviews'] (re-verified against the live site on 2026-09-11;
+   GuruWalk changed the card markup — the reviewer name moved from
+   typography-body-large to typography-body-medium-emphasized, and the card's
+   innerText is now concatenated without newlines):
 
-     <div data-testid="reviews">
-       <button ...>                                  <- one card per review
-         <span class="typography-body-large">Jane</span>
-         <span ...>Traveled as couple</span> / "Booking verified"
-         <span ...>Jun 2026</span>                   <- month granularity only
-         <svg><path d="m12 17.275...">               <- full star
-         <svg><path d="M12 7.125v7.8...">            <- half star
-         ...review text...
+     <div data-testid="reviews">        <- rendered twice; dedupe across both roots
+       <button ...>                     <- one card per review
+         <span role="img" aria-label="Jo">J</span>                 <- avatar (name in aria-label)
+         <span class="typography-body-medium-emphasized">Jo</span> <- reviewer name
+         <span ...>Guided by X</span> / "Booking verified"
+         <span ...>Traveled as couple</span>
+         <span ...>Sep 2026</span>       <- month granularity only
+         <svg><path d="m12 17.275...">   <- full star (partial/half: "m8.85 16.825")
+         ...review text (immediately follows the "Mon YYYY" token)...
+
+   Because the fields are glued together in innerText, the parser splits on the
+   first "Mon YYYY" token and takes everything after it as the review body
+   (the old line-splitting approach no longer works).
 
 3. Save new reviews via base_scraper.save_review() with platform="guruwalk".
 
 Limitations:
 - The carousel exposes only the ~5 most recent reviews per tour (the full
   history sits behind a modal with pagination -- not scraped yet).
-- review_date is month granularity (e.g. "2026-06"); GuruWalk doesn't show
+- review_date is month granularity (e.g. "2026-09"); GuruWalk doesn't show
   the day. Dedup key (name + month) can collide if the same first name
   reviews the same tour twice in one month.
+- Per-review stars render only full and partial glyphs (no empty placeholders
+  observed); the partial glyph is treated as a half star. DW's GuruWalk reviews
+  are almost all 5★, so any half/empty ambiguity is negligible.
 
 Run standalone:
     python scrapers/guruwalk_scraper.py
@@ -61,29 +72,42 @@ PROVIDER_KEYWORD = "charing cross"
 # stars contain "7.125v7.8".
 EXTRACT_REVIEWS_JS = """
 () => {
-  const cards = Array.from(
-    document.querySelectorAll("[data-testid='reviews'] button")
-  ).filter(b => b.querySelector('span.typography-body-large'));
-  return cards.map(c => {
-    const name =
-      c.querySelector('span.typography-body-large')?.innerText?.trim() || '';
-    const spanTexts = Array.from(c.querySelectorAll('span'))
-      .map(s => s.innerText.trim());
-    const date = spanTexts.find(t => /^[A-Z][a-z]{2,8} \\d{4}$/.test(t)) || '';
-    let full = 0, half = 0;
-    for (const p of c.querySelectorAll('svg path')) {
-      const d = p.getAttribute('d') || '';
-      if (d.startsWith('m12 17.275')) full++;
-      else if (d.includes('7.125v7.8')) half++;
+  const seen = new Set();
+  const out = [];
+  // The carousel is rendered inside two identical [data-testid='reviews'] roots;
+  // iterate both and dedupe. Each review is a <button> whose reviewer name is in
+  // span.typography-body-medium-emphasized (was typography-body-large pre-2026-09).
+  for (const root of document.querySelectorAll("[data-testid='reviews']")) {
+    const cards = Array.from(root.querySelectorAll('button'))
+      .filter(b => b.querySelector('span.typography-body-medium-emphasized'));
+    for (const c of cards) {
+      const name = (
+        c.querySelector('span.typography-body-medium-emphasized')?.innerText ||
+        c.querySelector('[role="img"]')?.getAttribute('aria-label') || ''
+      ).trim();
+      // innerText glues the fields together and ends "...<Mon YYYY><review text>".
+      // Split on the first "Mon YYYY" token; the remainder is the review body.
+      const raw = (c.innerText || '').replace(/\\s+/g, ' ').trim();
+      const dm = raw.match(/[A-Z][a-zA-Z]{2,11}\\s+\\d{4}/);
+      const date = dm ? dm[0] : '';
+      let text = dm ? raw.slice(dm.index + dm[0].length) : '';
+      text = text.replace(/\\s*(Read more|Show less)\\s*$/i, '').trim();
+      // Star rating from SVG path shapes: full star starts "m12 17.275",
+      // the partial (half) star "m8.85 16.825". Only star glyphs use these.
+      let full = 0, half = 0;
+      for (const p of c.querySelectorAll('svg path')) {
+        const d = p.getAttribute('d') || '';
+        if (d.startsWith('m12 17.275')) full++;
+        else if (d.startsWith('m8.85 16.825')) half++;
+      }
+      const key = name + '|' + date + '|' + text.slice(0, 40);
+      if (name && !seen.has(key)) {
+        seen.add(key);
+        out.push({ name, date, full, half, text });
+      }
     }
-    const skip = new Set([name, date, 'Booking verified', 'Read more', 'Show less']);
-    const text = c.innerText
-      .split('\\n')
-      .map(l => l.trim())
-      .filter(l => l && !skip.has(l) && !/^Traveled/.test(l) && !/^Guided by\\b/.test(l))
-      .join(' ');
-    return { name, date, full, half, text };
-  });
+  }
+  return out;
 }
 """
 
