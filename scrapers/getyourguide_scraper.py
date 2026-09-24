@@ -46,10 +46,14 @@ Limitations:
   anonymous reviewers from the same country reviewing the same tour on the same
   day collide (same class of caveat as guruwalk's month-granularity dates).
   Rare in practice -- ~1.4% of rows on the first full run.
-- Pages are scraped in en-US so tour_name is the English title (the dashboard
-  is English-facing). The reviews themselves stay in each reviewer's original
-  language. tour_name is stable as long as the locale is pinned -- changing the
-  locale changes the titles and will create new dedup keys.
+- Pages are scraped in en-US so titles are English (the dashboard is
+  English-facing); the reviews stay in each reviewer's original language.
+- GYG's display title for an activity is NOT stable across runs (it alternates
+  between variants even at en-US, and changes outright when a tour is renamed).
+  tour_name is therefore canonicalized by the stable activity ID via
+  CANONICAL_TITLES (see the map near the top); the volatile page title is only a
+  fallback for unmapped activities. Historical rows were migrated to these
+  canonical titles on 2026-09-12.
 
 Run standalone:
     python scrapers/getyourguide_scraper.py
@@ -76,6 +80,25 @@ from base_scraper import (
 SUPPLIER_URL = "https://www.getyourguide.com/discover-walks-s2584/"
 PLATFORM = "getyourguide"
 PARIS_LAT, PARIS_LON = 48.8566, 2.3522
+
+# GetYourGuide serves inconsistent display titles for the same activity between
+# runs (e.g. Marais alternates "Paris: Marais without crowds. Guided Tour." and
+# "Paris: Marais Guided Tour Without the Crowds"), even pinned to en-US. That
+# breaks the (platform, tour_name, reviewer, date) dedup key. The activity ID
+# (the trailing t<digits> in the URL) is stable, so we canonicalize tour_name by
+# it: whatever variant the page shows, we store the title below. Unknown IDs
+# fall back to the scraped title (a new tour just needs adding here). When GYG
+# renames a tour we keep its CURRENT title as canonical and migrate old rows.
+CANONICAL_TITLES = {
+    592477:  "Paris: Montmartre Guided Walking Tour",
+    629577:  "Paris: Marais Guided Tour Without the Crowds",
+    16624:   "Paris: Flea Market Insider's Tour in an Extra-Small Group",
+    691539:  "Notre-Dame to Louvre: Paris' Best in 90 Minutes with a Local",
+    1288952: "Paris: Evening at Montmartre with a Local Guide",
+    715113:  "Paris for Art Lovers: Montmartre and Renoir’s Gardens",
+    782599:  "Places Parisians Love - Classic Treasures and Hidden Gems",
+    788155:  "Paris Left Bank: Writers, Revolution, and Black Coffee",
+}
 
 BLOCKS_ENDPOINT = (
     "https://travelers-api.getyourguide.com/user-interface/activity-details-page/blocks"
@@ -190,8 +213,11 @@ async def find_activities(page) -> list:
         aid = _activity_id(c["url"])
         if aid is None:
             continue
-        activities.append((c["title"], c["url"], aid))
-        print(f"  Found activity: {c['title']} (t{aid})")
+        # Canonicalize by stable activity ID; GYG's display title is volatile.
+        title = CANONICAL_TITLES.get(aid, c["title"])
+        activities.append((title, c["url"], aid))
+        extra = "" if aid in CANONICAL_TITLES else "  [unmapped title — add to CANONICAL_TITLES]"
+        print(f"  Found activity: {title} (t{aid}){extra}")
     return activities
 
 
