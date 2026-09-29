@@ -39,6 +39,7 @@ Run:
     streamlit run dashboard/app.py
 """
 
+import base64
 import html
 import os
 from datetime import date, datetime, timedelta, timezone
@@ -53,6 +54,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"  # platform badge icons
 REVIEWS_FILE = DATA_DIR / "reviews.csv"
 # Official per-platform aggregate ratings (overridable so tests can supply a fixture).
 TOUR_RATINGS_FILE = Path(os.environ.get("DW_TOUR_RATINGS_CSV", str(DATA_DIR / "tour_ratings.csv")))
@@ -477,10 +479,42 @@ def stars(rating: float) -> str:
 BADGE_SLATE = "#5B7A99"
 
 
+# Platform favicons live in dashboard/assets/<slug>.png and are embedded as
+# base64 data URIs (no runtime dependency on external image hosting). Cached in a
+# module-level dict so each icon is read + encoded once, not on every rerun.
+_ICON_CACHE: dict = {}
+
+
+def _platform_icon(platform: str):
+    """Return a base64 PNG data URI for a platform's icon, or None if absent."""
+    if platform not in _ICON_CACHE:
+        path = ASSETS_DIR / f"{platform}.png"
+        try:
+            data = base64.b64encode(path.read_bytes()).decode("ascii")
+            _ICON_CACHE[platform] = f"data:image/png;base64,{data}"
+        except OSError:
+            _ICON_CACHE[platform] = None  # no icon file -> text-only badge
+    return _ICON_CACHE[platform]
+
+
 def platform_badge(platform: str, label: str) -> str:
+    """Colored badge: the platform's favicon (if available) then its name.
+
+    The icon sits on a small white chip so light/transparent favicons stay
+    visible on the slate badge; the text label is always kept.
+    """
+    icon = _platform_icon(platform)
+    icon_html = (
+        f'<img src="{icon}" alt="" width="16" height="16" '
+        f'style="width:16px;height:16px;border-radius:3px;background:#fff;'
+        f'padding:1px;object-fit:contain;vertical-align:middle;" />'
+        if icon else ""
+    )
     return (
         f'<span style="background:{BADGE_SLATE};color:#fff;border-radius:6px;'
-        f'padding:2px 9px;font-size:11px;font-weight:600;letter-spacing:.3px;">{label}</span>'
+        f'padding:2px 9px;font-size:11px;font-weight:600;letter-spacing:.3px;'
+        f'display:inline-flex;align-items:center;gap:5px;">'
+        f'{icon_html}{label}</span>'
     )
 
 
