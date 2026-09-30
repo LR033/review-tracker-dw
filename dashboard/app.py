@@ -613,7 +613,7 @@ st.markdown(
     }
     .review-card.low { border-left-color: #E63946; background: rgba(230,57,70,0.10); }
     .review-card .rc-head { font-size: 13px; opacity: 0.9; margin-bottom: 4px; }
-    .review-card .rc-stars { font-size: 15px; color: #E0A030; }
+    .review-card .rc-stars { font-size: 18px; color: #E0A030; }
     .review-card.low .rc-stars { color: #E63946; }
     .review-card .rc-tour { opacity: 0.6; font-size: 12px; margin: 2px 0 6px; }
     .review-card .rc-text { font-size: 16px; line-height: 1.45; }
@@ -855,7 +855,7 @@ if active_tab == "📋 Reviews":
                 f'<div class="rc-head">'
                 f'{platform_badge(row["platform"], row["platform_label"])} '
                 f'&nbsp;<span class="rc-stars">{stars(rating)}</span> '
-                f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; {date_str}{badge}</div>'
+                f'&nbsp;<b>{name}</b> &nbsp;·&nbsp; Published on {date_str}{badge}</div>'
                 f'<div class="rc-tour">{row["tour_name"]}</div>'
                 f'<div class="rc-text">{text}</div>'
                 f'{note_html}'
