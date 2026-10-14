@@ -617,7 +617,11 @@ st.markdown(
     .review-card.low .rc-stars { color: #E63946; }
     .review-card .rc-tour { opacity: 0.6; font-size: 12px; margin: 2px 0 6px; }
     .review-card .rc-text { font-size: 16px; line-height: 1.45; }
-    .rc-note { font-style: italic; opacity: 0.7; font-size: 13px; margin-top: 8px; }
+    .rc-note { font-style: italic; opacity: 0.85; font-size: 13px; margin-top: 8px;
+               border-left: 2px solid #E9C46A; padding-left: 8px; }
+    .rc-note-label { font-style: normal; font-weight: 600; text-transform: uppercase;
+                     font-size: 10px; letter-spacing: 0.5px; color: #E9C46A;
+                     margin-right: 6px; }
 
     /* Review-card container (keys: revcard_*, revcardlow_*): the box that wraps
        the review text AND its controls (responded checkbox, note input) so they
@@ -841,7 +845,8 @@ if active_tab == "📋 Reviews":
         # on st-key-revcard*); the inner div is transparent and only supplies
         # the rc-* text styling.
         note_html = (
-            f'<div class="rc-note">📝 {html.escape(existing_note)}</div>'
+            f'<div class="rc-note"><span class="rc-note-label">Internal note</span>'
+            f'{html.escape(existing_note)}</div>'
             if existing_note else ""
         )
         card_key = f"revcardlow_{idx}" if needs_reply else f"revcard_{idx}"
@@ -874,12 +879,15 @@ if active_tab == "📋 Reviews":
                     set_responded(row, checked)
                     st.rerun()
 
-            # Internal note — collapsed expander; saved on change (blur /
-            # Ctrl+Enter). A 📝 label (vs ＋) signals a note is already saved.
+            # Internal note. When a note exists it's already shown visibly on
+            # the card above (rc-note), so here we offer only a collapsed
+            # "✏️ Edit note" affordance. When there's no note, show the
+            # "＋ Internal note" collapsed expander to add one. Either way the
+            # text_area keeps the stable "Internal note" label.
             note_key = f"note_{idx}"
             if note_key not in st.session_state:
                 st.session_state[note_key] = existing_note
-            note_label = "📝 Internal note" if existing_note else "＋ Internal note"
+            note_label = "✏️ Edit note" if existing_note else "＋ Internal note"
             with st.expander(note_label, expanded=False):
                 st.text_area(
                     "Internal note", key=note_key, height=68,

@@ -125,6 +125,50 @@ def test_internal_note_saves_and_persists():
     assert "checked passport policy with guide" in notes_csv.read_text()
 
 
+def test_note_absent_shows_collapsed_expander_only():
+    # With no saved note, a card must NOT render the visible rc-note block; the
+    # only note affordance is the collapsed "＋ Internal note" expander (whose
+    # text_area is still present for adding one).
+    notes_csv = Path(os.environ["DW_NOTES_CSV"])
+    if notes_csv.exists():
+        notes_csv.unlink()
+    # load_notes is @st.cache_data(ttl=5); an earlier test may have cached a
+    # note from the shared temp notes.csv. Clear it so this run reads empty.
+    import streamlit as st  # noqa: E402
+    st.cache_data.clear()
+    at = _run()
+    at.radio(key="rev_period").set_value("All").run()
+    assert not at.exception, at.exception
+    # Match the rendered span attribute, not the ".rc-note-label" CSS rule that
+    # is always injected in the <style> block.
+    md = " ".join(m.value for m in at.markdown)
+    assert 'class="rc-note-label"' not in md, \
+        "a visible internal-note block rendered even though no note is saved"
+    note_areas = [ta for ta in at.text_area if ta.label == "Internal note"]
+    assert note_areas, "no add-note text areas present in the absent-note state"
+
+
+def test_note_present_shown_visibly_with_edit_option():
+    # When a note exists it must be shown visibly on the card (rc-note block,
+    # labeled "Internal note"), not hidden in a collapsed expander — while an
+    # edit affordance (the text_area) remains available.
+    marker = "VISIBLE_NOTE_MARKER_abc123"
+    at = _run()
+    at.radio(key="rev_period").set_value("All").run()
+    notes = [ta for ta in at.text_area if ta.label == "Internal note"]
+    assert notes, "no note text areas to seed"
+    # Saving reruns the app (save_note clears the notes cache), so the same
+    # card now renders the visible note in this run.
+    notes[0].set_value(marker).run()
+    assert not at.exception, at.exception
+    md = " ".join(m.value for m in at.markdown)
+    assert 'class="rc-note-label"' in md, "visible internal-note block not rendered"
+    assert marker in md, "saved note text not shown visibly on the card"
+    # Edit option still present (text_area under the "✏️ Edit note" expander).
+    edit_areas = [ta for ta in at.text_area if ta.label == "Internal note"]
+    assert edit_areas, "no edit text_area present when a note exists"
+
+
 def test_all_tabs_render_without_exception():
     at = _run()
     for tab_idx in range(3):  # Reviews, Analytics, Tour Health
