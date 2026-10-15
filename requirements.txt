@@ -4,3 +4,5 @@ streamlit>=1.30
 plotly>=5.18
 anthropic>=0.40
 requests>=2.31
+gspread>=6.0
+google-auth>=2.0

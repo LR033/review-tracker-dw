@@ -64,6 +64,8 @@ os.environ["DW_TOUR_RATINGS_CSV"] = _build_tour_ratings_fixture()
 
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
+import gsheet_store  # noqa: E402  (dashboard dir is on sys.path above)
+
 
 def _run():
     return AppTest.from_file(APP, default_timeout=90).run()
@@ -167,6 +169,75 @@ def test_note_present_shown_visibly_with_edit_option():
     # Edit option still present (text_area under the "✏️ Edit note" expander).
     edit_areas = [ta for ta in at.text_area if ta.label == "Internal note"]
     assert edit_areas, "no edit text_area present when a note exists"
+
+
+class _SheetBoom(Exception):
+    pass
+
+
+def _boom(*args, **kwargs):
+    raise _SheetBoom("simulated Google Sheets failure")
+
+
+def test_sheet_read_failure_warns_and_does_not_crash():
+    # When the Sheet backend is enabled but a READ fails (quota/network/perm),
+    # the page must still render and show a visible warning — never crash, and
+    # never cache the failure as "no notes".
+    import streamlit as st
+    saved = (gsheet_store.enabled, gsheet_store.load_rows)
+    try:
+        gsheet_store.enabled = lambda: True
+        gsheet_store.load_rows = _boom
+        st.cache_data.clear()  # force the cached read to run the patched path
+        at = _run()
+        at.radio(key="rev_period").set_value("All").run()
+        assert not at.exception, at.exception
+        warnings = " ".join(w.value for w in at.warning)
+        assert ("load notes" in warnings or "load responses" in warnings), \
+            f"no persistence warning surfaced on read failure; warnings={warnings!r}"
+    finally:
+        gsheet_store.enabled, gsheet_store.load_rows = saved
+        st.cache_data.clear()
+
+
+def test_sheet_write_failure_warns_and_is_not_silently_dropped():
+    # When a WRITE fails, both the note-save and the responded-checkbox paths
+    # must surface a visible warning (so the write isn't silently dropped) and
+    # must not crash the page.
+    import streamlit as st
+    saved = (gsheet_store.enabled, gsheet_store.load_rows,
+             gsheet_store.upsert_row, gsheet_store.delete_row)
+    try:
+        gsheet_store.enabled = lambda: True
+        gsheet_store.load_rows = lambda tab: []   # reads succeed (empty) so the page renders
+        gsheet_store.upsert_row = _boom
+        gsheet_store.delete_row = _boom
+        st.cache_data.clear()
+        at = _run()
+        at.radio(key="rev_period").set_value("All").run()
+        assert not at.exception, at.exception
+
+        # Note-save path.
+        notes = [ta for ta in at.text_area if ta.label == "Internal note"]
+        assert notes, "no note text areas to exercise the write path"
+        notes[0].set_value("this should fail to persist").run()
+        assert not at.exception, at.exception
+        warnings = " ".join(w.value for w in at.warning)
+        assert "save the note" in warnings, \
+            f"note-save failure not surfaced; warnings={warnings!r}"
+
+        # Responded-checkbox path.
+        boxes = [cb for cb in at.checkbox if cb.label == "Mark as responded"]
+        assert boxes, "no 'Mark as responded' checkboxes to exercise the write path"
+        boxes[0].set_value(True).run()
+        assert not at.exception, at.exception
+        warnings = " ".join(w.value for w in at.warning)
+        assert "responded" in warnings, \
+            f"responded-save failure not surfaced; warnings={warnings!r}"
+    finally:
+        (gsheet_store.enabled, gsheet_store.load_rows,
+         gsheet_store.upsert_row, gsheet_store.delete_row) = saved
+        st.cache_data.clear()
 
 
 def test_all_tabs_render_without_exception():

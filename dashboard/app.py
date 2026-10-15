@@ -49,6 +49,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+import gsheet_store  # private Google Sheet backend for notes/responses (opt-in)
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -266,9 +268,38 @@ def row_key(row) -> tuple:
     )
 
 
-@st.cache_data(ttl=5)
-def load_responses() -> dict:
-    """Return {review_key: responded_at_iso} from responses.csv."""
+def _persist_warn(action: str, exc: Exception) -> None:
+    """Record a persistence failure (Google Sheet quota/network/permission) so
+    it's shown to the user as a visible warning near the top of the page, rather
+    than crashing the app or silently dropping the write. Flushed by
+    ``_flush_persist_warnings()`` on the next render."""
+    msg = (f"Couldn't {action} via the shared Google Sheet ({type(exc).__name__}: "
+           f"{exc}). Your change may not have been saved — retry, or check the "
+           f"sheet's sharing/quota.")
+    warns = st.session_state.setdefault("_persist_warnings", [])
+    if msg not in warns:
+        warns.append(msg)
+
+
+def _flush_persist_warnings() -> None:
+    for msg in st.session_state.pop("_persist_warnings", []):
+        st.warning("⚠️ " + msg)
+
+
+# Sheet reads are network calls, so cache them longer than the CSV path would
+# need (30–60s), and invalidate with .clear() after every write. The Sheet
+# branch deliberately does NOT catch — a transient read error must propagate out
+# of the cached function so it is never cached as an empty result (which would
+# masquerade as "no notes/responses"). The uncached wrapper below handles it.
+@st.cache_data(ttl=45)
+def _load_responses_cached() -> dict:
+    if gsheet_store.enabled():
+        out = {}
+        for r in gsheet_store.load_rows(gsheet_store.RESPONSES_TAB):
+            out[_norm_key(r.get("platform", ""), r.get("tour_name", ""),
+                          r.get("reviewer_name", ""), r.get("review_date", ""))] = \
+                r.get("responded_at", "")
+        return out
     if not RESPONSES_FILE.exists():
         return {}
     try:
@@ -283,13 +314,42 @@ def load_responses() -> dict:
     return out
 
 
-def set_responded(row, responded: bool) -> None:
-    """Add or remove a review's response record in responses.csv."""
+def load_responses() -> dict:
+    """Return {review_key: responded_at_iso} from the Google Sheet (when
+    configured) or responses.csv. A Sheet failure warns and returns empty for
+    this run only; the error is never cached, so the next rerun retries."""
+    try:
+        return _load_responses_cached()
+    except Exception as exc:  # noqa: BLE001
+        _persist_warn("load responses", exc)
+        return {}
+
+
+def set_responded(row, responded: bool) -> bool:
+    """Add or remove a review's response record (Google Sheet or responses.csv).
+
+    Returns True on success, False if the write failed (so the caller can avoid
+    an st.rerun() loop — the persisted state wouldn't have changed)."""
     key_fields = (
         str(row["platform"]), str(row["tour_name"]), str(row["reviewer_name"]),
         row["review_date"].strftime("%Y-%m-%d"),
     )
     target = _norm_key(*key_fields)
+
+    if gsheet_store.enabled():
+        ok = True
+        try:
+            if responded:
+                gsheet_store.upsert_row(gsheet_store.RESPONSES_TAB, key_fields, {
+                    "responded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                })
+            else:
+                gsheet_store.delete_row(gsheet_store.RESPONSES_TAB, key_fields)
+        except Exception as exc:  # noqa: BLE001
+            _persist_warn("save the responded status", exc)
+            ok = False
+        _load_responses_cached.clear()
+        return ok
 
     if RESPONSES_FILE.exists():
         rdf = pd.read_csv(RESPONSES_FILE, dtype=str).fillna("")
@@ -313,16 +373,25 @@ def set_responded(row, responded: bool) -> None:
 
     RESPONSES_FILE.parent.mkdir(parents=True, exist_ok=True)
     rdf.to_csv(RESPONSES_FILE, index=False)
-    load_responses.clear()
+    _load_responses_cached.clear()
+    return True
 
 
 # ---------------------------------------------------------------------------
 # Internal notes (data/notes.csv)
 # ---------------------------------------------------------------------------
 
-@st.cache_data(ttl=5)
-def load_notes() -> dict:
-    """Return {review_key: note_text} from notes.csv."""
+# Same cached/uncached split as responses: Sheet read errors propagate out of
+# the cached function (never cached as empty) and are handled by the wrapper.
+@st.cache_data(ttl=45)
+def _load_notes_cached() -> dict:
+    if gsheet_store.enabled():
+        out = {}
+        for r in gsheet_store.load_rows(gsheet_store.NOTES_TAB):
+            out[_norm_key(r.get("platform", ""), r.get("tour_name", ""),
+                          r.get("reviewer_name", ""), r.get("review_date", ""))] = \
+                r.get("note", "")
+        return out
     if not NOTES_FILE.exists():
         return {}
     try:
@@ -337,13 +406,40 @@ def load_notes() -> dict:
     return out
 
 
+def load_notes() -> dict:
+    """Return {review_key: note_text} from the Google Sheet (when configured) or
+    notes.csv. A Sheet failure warns and returns empty for this run only; the
+    error is never cached, so the next rerun retries."""
+    try:
+        return _load_notes_cached()
+    except Exception as exc:  # noqa: BLE001
+        _persist_warn("load notes", exc)
+        return {}
+
+
 def save_note(row, note_text: str) -> None:
-    """Upsert one review's internal note in notes.csv (empty note removes it)."""
+    """Upsert one review's internal note (Google Sheet or notes.csv). An empty
+    note removes the record."""
     key_fields = (
         str(row["platform"]), str(row["tour_name"]), str(row["reviewer_name"]),
         row["review_date"].strftime("%Y-%m-%d"),
     )
     target = _norm_key(*key_fields)
+    clean = note_text.strip() if note_text else ""
+
+    if gsheet_store.enabled():
+        try:
+            if clean:
+                gsheet_store.upsert_row(gsheet_store.NOTES_TAB, key_fields, {
+                    "note": clean,
+                    "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                })
+            else:
+                gsheet_store.delete_row(gsheet_store.NOTES_TAB, key_fields)
+        except Exception as exc:  # noqa: BLE001
+            _persist_warn("save the note", exc)
+        _load_notes_cached.clear()
+        return
 
     if NOTES_FILE.exists():
         ndf = pd.read_csv(NOTES_FILE, dtype=str).fillna("")
@@ -368,7 +464,7 @@ def save_note(row, note_text: str) -> None:
 
     NOTES_FILE.parent.mkdir(parents=True, exist_ok=True)
     ndf.to_csv(NOTES_FILE, index=False)
-    load_notes.clear()
+    _load_notes_cached.clear()
 
 
 def _save_note_cb(row, note_key: str) -> None:
@@ -697,6 +793,9 @@ PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 df = load_reviews()
 responded = load_responses()
 notes = load_notes()
+# Surface any persistence failure recorded this run (failed Sheet read above) or
+# by a write callback on the previous run — visibly, without crashing the page.
+_flush_persist_warnings()
 
 st.title("🗼 Discover Walks — Review Tracker")
 st.caption("Aggregated customer reviews across booking platforms · drafting & analysis powered by Claude.")
@@ -876,8 +975,12 @@ if active_tab == "📋 Reviews":
                     st.session_state[cb_key] = is_resp
                 checked = st.checkbox("Mark as responded", key=cb_key)
                 if checked != is_resp:
-                    set_responded(row, checked)
-                    st.rerun()
+                    if set_responded(row, checked):
+                        st.rerun()
+                    else:
+                        # Write failed: surface it now (we can't rerun — the
+                        # persisted state didn't change, so re-firing would loop).
+                        _flush_persist_warnings()
 
             # Internal note. When a note exists it's already shown visibly on
             # the card above (rc-note), so here we offer only a collapsed
