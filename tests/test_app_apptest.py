@@ -15,6 +15,7 @@ or under pytest:
 """
 
 import csv
+import contextlib
 import os
 import sys
 import tempfile
@@ -65,6 +66,58 @@ os.environ["DW_TOUR_RATINGS_CSV"] = _build_tour_ratings_fixture()
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 import gsheet_store  # noqa: E402  (dashboard dir is on sys.path above)
+import streamlit as st  # noqa: E402
+
+# --- Test isolation: never touch the real Google Sheet (see gsheet_store) ---
+# Force the Sheet backend OFF by default and trip a guard on any real Sheet
+# connection. app.py swallows Sheet exceptions (graceful degradation), so a
+# bare raise would be downgraded to a warning -- the guard therefore records
+# the violation and the isolation teardown re-raises it, failing the test
+# before any write can land. Sheet-path tests mock gsheet_store themselves and
+# never reach the real _spreadsheet().
+_REAL_ENABLED = gsheet_store.enabled
+_REAL_SPREADSHEET = gsheet_store._spreadsheet
+_SHEET_VIOLATION = {"hit": False}
+
+
+def _tripwire(*_args, **_kwargs):
+    _SHEET_VIOLATION["hit"] = True
+    raise RuntimeError(
+        "TEST ISOLATION: gsheet_store.enabled() was True but the Sheet I/O was "
+        "not mocked -- a real Google Sheet access was attempted (blocked before "
+        "any read/write)."
+    )
+
+
+@contextlib.contextmanager
+def _sheet_isolation():
+    _SHEET_VIOLATION["hit"] = False
+    st.cache_data.clear()
+    gsheet_store.enabled = lambda: False
+    gsheet_store._spreadsheet = _tripwire
+    try:
+        yield
+    finally:
+        gsheet_store.enabled = _REAL_ENABLED
+        gsheet_store._spreadsheet = _REAL_SPREADSHEET
+        st.cache_data.clear()
+        if _SHEET_VIOLATION["hit"]:
+            raise AssertionError(
+                "TEST ISOLATION: a real Google Sheet access was attempted while "
+                "gsheet_store.enabled() was True and not mocked."
+            )
+
+
+try:
+    import pytest
+except ImportError:  # direct `python tests/...` run (pytest not installed here)
+    pytest = None
+
+if pytest is not None:
+    @pytest.fixture(autouse=True)
+    def _isolate_sheet_backend():
+        with _sheet_isolation():
+            yield
 
 
 def _run():
@@ -353,7 +406,8 @@ def _run_all():
     failures = 0
     for t in tests:
         try:
-            t()
+            with _sheet_isolation():
+                t()
             print(f"PASS  {t.__name__}")
         except Exception as exc:  # noqa: BLE001
             failures += 1

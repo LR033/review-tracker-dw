@@ -12,13 +12,69 @@ or under pytest:
     pytest tests/test_gsheet_store.py
 """
 
+import contextlib
 import sys
+import types
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "dashboard"))
 
 import gsheet_store as gs  # noqa: E402
+import streamlit as st  # noqa: E402
+
+# --- Test isolation: never touch the real Google Sheet ---------------------
+# A local .streamlit/secrets.toml carrying a service account would otherwise
+# make these tests read/write the production sheet. Force the backend OFF by
+# default and trip a guard on any real Sheet connection. Because app.py wraps
+# its Sheet calls in try/except (graceful degradation), a bare raise would be
+# downgraded to a warning -- so the guard also records the violation and the
+# isolation teardown re-raises it, failing the test before any write can land.
+# Tests that exercise the Sheet path mock gsheet_store themselves and never
+# reach the real _spreadsheet().
+_REAL_ENABLED = gs.enabled
+_REAL_SPREADSHEET = gs._spreadsheet
+_SHEET_VIOLATION = {"hit": False}
+
+
+def _tripwire(*_args, **_kwargs):
+    _SHEET_VIOLATION["hit"] = True
+    raise RuntimeError(
+        "TEST ISOLATION: gsheet_store.enabled() was True but the Sheet I/O was "
+        "not mocked -- a real Google Sheet access was attempted (blocked before "
+        "any read/write)."
+    )
+
+
+@contextlib.contextmanager
+def _sheet_isolation():
+    _SHEET_VIOLATION["hit"] = False
+    st.cache_data.clear()
+    gs.enabled = lambda: False
+    gs._spreadsheet = _tripwire
+    try:
+        yield
+    finally:
+        gs.enabled = _REAL_ENABLED
+        gs._spreadsheet = _REAL_SPREADSHEET
+        st.cache_data.clear()
+        if _SHEET_VIOLATION["hit"]:
+            raise AssertionError(
+                "TEST ISOLATION: a real Google Sheet access was attempted while "
+                "gsheet_store.enabled() was True and not mocked."
+            )
+
+
+try:
+    import pytest
+except ImportError:  # direct `python tests/...` run (pytest not installed here)
+    pytest = None
+
+if pytest is not None:
+    @pytest.fixture(autouse=True)
+    def _isolate_sheet_backend():
+        with _sheet_isolation():
+            yield
 
 
 class FakeWorksheet:
@@ -79,8 +135,14 @@ def test_norm_and_key_matching():
 
 
 def test_enabled_false_without_service_account():
-    # No gcp_service_account secret (and gspread not installed) -> disabled.
-    assert gs.enabled() is False
+    # Independent of any local .streamlit/secrets.toml: fake an empty secrets
+    # mapping (no gcp_service_account) and assert the REAL enabled() -> False.
+    real_st = gs.st
+    try:
+        gs.st = types.SimpleNamespace(secrets={})
+        assert _REAL_ENABLED() is False
+    finally:
+        gs.st = real_st
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +217,8 @@ def _run_all():
     failures = 0
     for t in tests:
         try:
-            t()
+            with _sheet_isolation():
+                t()
             print(f"PASS  {t.__name__}")
         except Exception as exc:  # noqa: BLE001
             failures += 1
