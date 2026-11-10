@@ -1,0 +1,2574 @@
+{
+ "contractVersion": "1.0",
+ "content": [
+  {
+   "__entity": "block",
+   "id": "review-review-list-129471020",
+   "type": "granular",
+   "controller": {
+    "__entity": "granularBlockController",
+    "type": "trackingController",
+    "action": "CARD_IMPRESSION",
+    "trackingEvent": {
+     "eventName": "TravelerWebReviewView",
+     "containerName": "Activity",
+     "properties": {
+      "activity_id": 629577,
+      "review_rating": 4,
+      "review_date": "2026-11-08T08:51:49+01:00",
+      "review_length": 0,
+      "language": "",
+      "review_id": 129471020,
+      "target": "activity-review-card",
+      "review_rank": 0,
+      "ui_source": "reviews_section",
+      "countryCode": "NL",
+      "traveler_type": "family_old",
+      "ranking_uuid": null,
+      "producer_properties": {
+       "context": {
+        "owner": "rvw"
+       }
+      }
+     }
+    }
+   },
+   "layout": {
+    "__entity": "block",
+    "id": "review-review-list-129471020-vertical",
+    "type": "verticalLayout",
+    "content": [
+     {
+      "__entity": "block",
+      "id": "review-review-list-129471020-vertical-0-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-0-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-1-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-2-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-3-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-4-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-5-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-6-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-7-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-0-horizontal-8-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "surface-secondary"
+       }
+      ],
+      "layoutModifier": {
+       "width": "wrapContent",
+       "height": "wrapContent",
+       "size": {
+        "width": "wrapContent",
+        "height": "wrapContent"
+       }
+      },
+      "verticalAlignment": "center"
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129471020-vertical-1-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129471020-vertical-2-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-2-horizontal-0-z-layout",
+        "type": "zLayout",
+        "content": [
+         {
+          "__entity": "block",
+          "id": "review-review-list-129471020-vertical-2-horizontal-0-z-layout-0-rect",
+          "type": "rectangleAtom",
+          "layoutModifier": {
+           "size": {
+            "width": 40,
+            "height": 40
+           },
+           "background": "decorative-guiding-red",
+           "width": 5,
+           "height": 5,
+           "radius": {
+            "topStart": "full",
+            "bottomStart": "full",
+            "topEnd": "full",
+            "bottomEnd": "full"
+           }
+          }
+         },
+         {
+          "__entity": "block",
+          "id": "review-review-list-129471020-vertical-2-horizontal-0-z-layout-1-text",
+          "type": "textAtom",
+          "layoutModifier": {
+           "width": "wrapContent",
+           "height": "wrapContent",
+           "size": {
+            "width": "wrapContent",
+            "height": "wrapContent"
+           }
+          },
+          "text": "G",
+          "color": "label-quaternary",
+          "typography": "title-2",
+          "font": "heading-sm"
+         }
+        ],
+        "layoutModifier": {
+         "size": {
+          "width": 40,
+          "height": 40
+         },
+         "width": 5,
+         "height": 5
+        },
+        "verticalAlignment": "center",
+        "horizontalAlignment": "center"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-2-horizontal-1-vertical",
+        "type": "verticalLayout",
+        "content": [
+         {
+          "__entity": "block",
+          "id": "review-review-list-129471020-vertical-2-horizontal-1-vertical-0-text",
+          "type": "textAtom",
+          "layoutModifier": {
+           "width": "wrapContent",
+           "height": "wrapContent",
+           "size": {
+            "width": "wrapContent",
+            "height": "wrapContent"
+           }
+          },
+          "text": "GetYourGuide traveler – Netherlands",
+          "color": "label-primary",
+          "typography": "caption-strong",
+          "font": "text-medium-xs"
+         },
+         {
+          "__entity": "block",
+          "id": "review-review-list-129471020-vertical-2-horizontal-1-vertical-1-text",
+          "type": "textAtom",
+          "layoutModifier": {
+           "width": "wrapContent",
+           "height": "wrapContent",
+           "size": {
+            "width": "wrapContent",
+            "height": "wrapContent"
+           }
+          },
+          "text": "November 8, 2026 - Verified booking",
+          "color": "label-secondary",
+          "typography": "caption",
+          "font": "text-regular-xs"
+         }
+        ],
+        "layoutModifier": {
+         "size": {
+          "width": "fillParent",
+          "height": "wrapContent"
+         },
+         "width": "fillParent",
+         "height": "wrapContent",
+         "padding": {
+          "start": 2
+         }
+        }
+       }
+      ],
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "className": "paginated-review-card-author",
+       "width": "fillParent",
+       "height": "wrapContent"
+      },
+      "verticalAlignment": "center"
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129471020-vertical-3-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129471020-vertical-4-vertical",
+      "type": "verticalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129471020-vertical-4-vertical-0-styled-text",
+        "type": "styledTextAtom",
+        "layoutModifier": {
+         "size": {
+          "width": "fillParent",
+          "height": "wrapContent"
+         },
+         "width": "fillParent",
+         "height": "wrapContent"
+        },
+        "tokens": [
+         {
+          "text": "",
+          "defaultStyle": {
+           "color": "label-primary",
+           "typography": "body",
+           "font": "text-regular-sm"
+          }
+         }
+        ]
+       }
+      ],
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "width": "fillParent",
+       "height": "wrapContent"
+      }
+     }
+    ],
+    "layoutModifier": {
+     "size": {
+      "width": "fillParent",
+      "height": "wrapContent"
+     },
+     "width": "fillParent",
+     "height": "wrapContent",
+     "padding": {
+      "top": 3,
+      "bottom": 3
+     }
+    },
+    "onImpression": {
+     "name": "CARD_IMPRESSION"
+    }
+   },
+   "contentKey": "activity-review-card"
+  },
+  {
+   "__entity": "block",
+   "id": "review-review-list-129257336",
+   "type": "granular",
+   "controller": {
+    "__entity": "granularBlockController",
+    "type": "composableListController",
+    "controllers": [
+     {
+      "__entity": "granularBlockController",
+      "type": "setStateFieldController",
+      "action": "TOGGLE_EXPAND",
+      "stateField": "isExpanded-129257336",
+      "value": {
+       "type": "notExpression",
+       "operand": {
+        "type": "getStateExpression",
+        "stateField": "isExpanded-129257336"
+       }
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "trackingController",
+      "action": "CARD_IMPRESSION",
+      "trackingEvent": {
+       "eventName": "TravelerWebReviewView",
+       "containerName": "Activity",
+       "properties": {
+        "activity_id": 629577,
+        "review_rating": 5,
+        "review_date": "2026-10-30T12:02:11+01:00",
+        "review_length": 306,
+        "language": "en",
+        "review_id": 129257336,
+        "target": "activity-review-card",
+        "review_rank": 5,
+        "ui_source": "reviews_section",
+        "countryCode": "AU",
+        "traveler_type": "solo",
+        "ranking_uuid": null,
+        "producer_properties": {
+         "context": {
+          "owner": "rvw"
+         }
+        }
+       }
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "composableListController",
+      "controllers": [
+       {
+        "__entity": "granularBlockController",
+        "type": "setStateFieldController",
+        "action": "UPVOTE_REVIEW",
+        "stateField": "isHelpfulLoading-129257336",
+        "value": {
+         "type": "booleanExpression",
+         "value": true
+        }
+       },
+       {
+        "__entity": "granularBlockController",
+        "type": "interactionConfigurationController",
+        "action": "UPVOTE_REVIEW",
+        "interactionConfiguration": {
+         "__entity": "interactionConfiguration",
+         "type": "composableInteractionConfiguration",
+         "interactionConfigurations": [
+          {
+           "__entity": "interactionConfiguration",
+           "type": "trackingInteractionConfiguration",
+           "trackingEvent": {
+            "eventName": "TravelerWebReviewUpVoteClick",
+            "containerName": "Activity",
+            "properties": {
+             "review_id": 129257336,
+             "ui_source": "reviews_section",
+             "producer_properties": {
+              "context": {
+               "owner": "rvw"
+              }
+             }
+            }
+           }
+          },
+          {
+           "__entity": "interactionConfiguration",
+           "type": "loginModalInteractionConfiguration",
+           "onAction": {
+            "type": "reviewUpvoted",
+            "emitterId": "reloadable-review-card-129257336",
+            "payload": {
+             "reviewId": 129257336
+            }
+           },
+           "title": "Log in to give feedback",
+           "valueProposition": "Please log in or sign up to give feedback on this review."
+          }
+         ]
+        }
+       }
+      ]
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "sduiEventListeningController",
+      "actionToEmit": {
+       "name": "RESET_HELPFUL_LOADING"
+      },
+      "listenerConfigurations": [
+       {
+        "eventType": "loginDismissed"
+       }
+      ]
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "setStateFieldController",
+      "action": "RESET_HELPFUL_LOADING",
+      "stateField": "isHelpfulLoading-129257336",
+      "value": {
+       "type": "booleanExpression",
+       "value": false
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "interactionConfigurationController",
+      "action": "OPEN_REVIEW_OPTIONS_MENU",
+      "interactionConfiguration": {
+       "__entity": "interactionConfiguration",
+       "type": "openReviewCardOptionsInteractionConfiguration",
+       "reviewId": 129257336
+      }
+     }
+    ]
+   },
+   "state": {
+    "stateFields": [
+     {
+      "fieldName": "isExpanded-129257336",
+      "type": "boolean",
+      "value": false
+     },
+     {
+      "fieldName": "isHelpfulLoading-129257336",
+      "type": "boolean",
+      "value": false
+     }
+    ]
+   },
+   "layout": {
+    "__entity": "block",
+    "id": "review-review-list-129257336-vertical",
+    "type": "verticalLayout",
+    "content": [
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-0-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-0-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-1-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-2-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-3-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-4-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-5-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-6-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-7-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-0-horizontal-8-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       }
+      ],
+      "layoutModifier": {
+       "width": "wrapContent",
+       "height": "wrapContent",
+       "size": {
+        "width": "wrapContent",
+        "height": "wrapContent"
+       }
+      },
+      "verticalAlignment": "center"
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-1-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-2-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-2-horizontal-0-horizontal",
+        "type": "horizontalLayout",
+        "content": [
+         {
+          "__entity": "block",
+          "id": "review-review-list-129257336-vertical-2-horizontal-0-horizontal-0-z-layout",
+          "type": "zLayout",
+          "content": [
+           {
+            "__entity": "block",
+            "id": "review-review-list-129257336-vertical-2-horizontal-0-horizontal-0-z-layout-0-rect",
+            "type": "rectangleAtom",
+            "layoutModifier": {
+             "size": {
+              "width": 40,
+              "height": 40
+             },
+             "background": "decorative-midnight-blue",
+             "width": 5,
+             "height": 5,
+             "radius": {
+              "topStart": "full",
+              "bottomStart": "full",
+              "topEnd": "full",
+              "bottomEnd": "full"
+             }
+            }
+           },
+           {
+            "__entity": "block",
+            "id": "review-review-list-129257336-vertical-2-horizontal-0-horizontal-0-z-layout-1-text",
+            "type": "textAtom",
+            "layoutModifier": {
+             "width": "wrapContent",
+             "height": "wrapContent",
+             "size": {
+              "width": "wrapContent",
+              "height": "wrapContent"
+             }
+            },
+            "text": "T",
+            "color": "label-quaternary",
+            "typography": "title-2",
+            "font": "heading-sm"
+           }
+          ],
+          "layoutModifier": {
+           "size": {
+            "width": 40,
+            "height": 40
+           },
+           "width": 5,
+           "height": 5
+          },
+          "verticalAlignment": "center",
+          "horizontalAlignment": "center"
+         },
+         {
+          "__entity": "block",
+          "id": "review-review-list-129257336-vertical-2-horizontal-0-horizontal-1-vertical",
+          "type": "verticalLayout",
+          "content": [
+           {
+            "__entity": "block",
+            "id": "review-review-list-129257336-vertical-2-horizontal-0-horizontal-1-vertical-0-text",
+            "type": "textAtom",
+            "layoutModifier": {
+             "width": "wrapContent",
+             "height": "wrapContent",
+             "size": {
+              "width": "wrapContent",
+              "height": "wrapContent"
+             }
+            },
+            "text": "Traveler A – Australia",
+            "color": "label-primary",
+            "typography": "caption-strong",
+            "font": "text-medium-xs"
+           },
+           {
+            "__entity": "block",
+            "id": "review-review-list-129257336-vertical-2-horizontal-0-horizontal-1-vertical-1-text",
+            "type": "textAtom",
+            "layoutModifier": {
+             "width": "wrapContent",
+             "height": "wrapContent",
+             "size": {
+              "width": "wrapContent",
+              "height": "wrapContent"
+             }
+            },
+            "text": "October 30, 2026 - Verified booking",
+            "color": "label-secondary",
+            "typography": "caption",
+            "font": "text-regular-xs"
+           }
+          ],
+          "layoutModifier": {
+           "size": {
+            "width": "fillParent",
+            "height": "wrapContent"
+           },
+           "width": "fillParent",
+           "height": "wrapContent",
+           "padding": {
+            "start": 2
+           }
+          }
+         }
+        ],
+        "layoutModifier": {
+         "weight": 1,
+         "width": "wrapContent",
+         "height": "wrapContent",
+         "size": {
+          "width": "wrapContent",
+          "height": "wrapContent"
+         }
+        },
+        "verticalAlignment": "center"
+       },
+       {
+        "__entity": "block",
+        "id": "review-129257336-options-menu",
+        "type": "horizontalLayout",
+        "content": [
+         {
+          "__entity": "block",
+          "id": "review-review-list-129257336-vertical-2-horizontal-1-horizontal-0-icon",
+          "type": "iconAtom",
+          "layoutModifier": {
+           "size": {
+            "width": 36,
+            "height": 36
+           },
+           "width": 4.5,
+           "height": 4.5
+          },
+          "iconName": "dots",
+          "color": "label-primary"
+         }
+        ],
+        "layoutModifier": {
+         "size": {
+          "width": "wrapContent",
+          "height": "wrapContent"
+         },
+         "width": "wrapContent",
+         "height": "wrapContent"
+        },
+        "onClick": {
+         "name": "OPEN_REVIEW_OPTIONS_MENU"
+        }
+       }
+      ],
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "className": "paginated-review-card-author",
+       "width": "fillParent",
+       "height": "wrapContent"
+      },
+      "verticalAlignment": "center"
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-3-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-4-image-gallery",
+      "type": "imageGalleryAtom",
+      "layoutModifier": {
+       "className": "paginated-review-card-images",
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "width": "fillParent",
+       "height": "wrapContent"
+      },
+      "media": [
+       {
+        "type": "galleryImage",
+        "url": "https://cdn.getyourguide.com/img/review/d08e205c829ced027e4bb1a56cd7b38cf1f9fe6f098fc9fd84fcba2d9045d85e.jpg/99.jpg",
+        "thumbnailUrl": "https://cdn.getyourguide.com/img/review/d08e205c829ced027e4bb1a56cd7b38cf1f9fe6f098fc9fd84fcba2d9045d85e.jpg/53.jpg"
+       },
+       {
+        "type": "galleryImage",
+        "url": "https://cdn.getyourguide.com/img/review/e7f19a631be4ffbaf24691d3e26e0ee163828b60f8b4cfc22343973629e7d22b.jpg/99.jpg",
+        "thumbnailUrl": "https://cdn.getyourguide.com/img/review/e7f19a631be4ffbaf24691d3e26e0ee163828b60f8b4cfc22343973629e7d22b.jpg/53.jpg"
+       },
+       {
+        "type": "galleryImage",
+        "url": "https://cdn.getyourguide.com/img/review/b194b3fa620f86e756bcdb8e271e20620a9c2973e4a3fa2ca8593f650f318af3.jpg/99.jpg",
+        "thumbnailUrl": "https://cdn.getyourguide.com/img/review/b194b3fa620f86e756bcdb8e271e20620a9c2973e4a3fa2ca8593f650f318af3.jpg/53.jpg"
+       }
+      ],
+      "maxDisplayCount": 5,
+      "itemSize": {
+       "width": 100,
+       "height": 100
+      },
+      "itemRadius": 1,
+      "checkAvailabilityOnClick": {
+       "__entity": "interactionConfiguration",
+       "type": "composableInteractionConfiguration",
+       "interactionConfigurations": [
+        {
+         "__entity": "interactionConfiguration",
+         "type": "scrollToInteractionConfiguration",
+         "scrollToBlockId": "short-description-adp-text",
+         "alignment": "center",
+         "behavior": "smooth",
+         "withAutofocus": true
+        },
+        {
+         "__entity": "interactionConfiguration",
+         "type": "emitEventInteractionConfiguration",
+         "event": {
+          "type": "openPicker",
+          "payload": {
+           "pickerId": "booking-assistant-date-picker"
+          }
+         }
+        }
+       ]
+      },
+      "useWhiteBgViewer": true
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-5-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-6-if-layout",
+      "type": "ifLayout",
+      "layoutModifier": {
+       "width": "wrapContent",
+       "height": "wrapContent",
+       "size": {
+        "width": "wrapContent",
+        "height": "wrapContent"
+       }
+      },
+      "condition": {
+       "fieldName": "isExpanded-129257336"
+      },
+      "trueContent": {
+       "__entity": "block",
+       "id": "review-review-list-129257336-vertical-6-if-layout-true-vertical",
+       "type": "verticalLayout",
+       "content": [
+        {
+         "__entity": "block",
+         "id": "review-review-list-129257336-vertical-6-if-layout-true-vertical-0-text",
+         "type": "textAtom",
+         "layoutModifier": {
+          "size": {
+           "width": "fillParent",
+           "height": "wrapContent"
+          },
+          "width": "fillParent",
+          "height": "wrapContent"
+         },
+         "text": "A fantastic tour with our guide Adrian. It was enlightening to hear the mixed history of Le Marais and see spots I wouldn’t have discovered on my own. The sharing of history and stories was really engaging and often surprising. A perfect start to my first day in the Marais, I highly recommended this tour.",
+         "color": "label-primary",
+         "typography": "body",
+         "font": "text-regular-sm"
+        }
+       ],
+       "layoutModifier": {
+        "size": {
+         "width": "fillParent",
+         "height": "wrapContent"
+        },
+        "width": "fillParent",
+        "height": "wrapContent"
+       }
+      },
+      "falseContent": {
+       "__entity": "block",
+       "id": "review-review-list-129257336-vertical-6-if-layout-false-vertical",
+       "type": "verticalLayout",
+       "content": [
+        {
+         "__entity": "block",
+         "id": "review-review-list-129257336-vertical-6-if-layout-false-vertical-0-text",
+         "type": "textAtom",
+         "layoutModifier": {
+          "size": {
+           "width": "fillParent",
+           "height": "wrapContent"
+          },
+          "width": "fillParent",
+          "height": "wrapContent"
+         },
+         "text": "A fantastic tour with our guide Adrian. It was enlightening to hear the mixed history of Le Marais and see spots I wouldn’t have discovered on my own. The sharing of history and stories was really engaging and often surprising. A perfect start to my first day in the Marais, I highly recommended this tour.",
+         "color": "label-primary",
+         "typography": "body",
+         "font": "text-regular-sm",
+         "maxLines": 4,
+         "overflow": "ellipsis",
+         "overflowSuffix": {
+          "__entity": "block",
+          "id": "review-review-list-129257336-vertical-6-if-layout-false-vertical-0-styled-text",
+          "type": "styledTextAtom",
+          "layoutModifier": {
+           "className": "c-button--text",
+           "width": "wrapContent",
+           "height": "wrapContent",
+           "size": {
+            "width": "wrapContent",
+            "height": "wrapContent"
+           }
+          },
+          "tokens": [
+           {
+            "text": "Read more",
+            "className": "c-button__text",
+            "onClick": {
+             "name": "TOGGLE_EXPAND"
+            },
+            "defaultStyle": {
+             "color": "label-secondary",
+             "typography": "body-strong",
+             "font": "text-medium-sm"
+            }
+           }
+          ]
+         }
+        }
+       ],
+       "layoutModifier": {
+        "size": {
+         "width": "fillParent",
+         "height": "wrapContent"
+        },
+        "width": "fillParent",
+        "height": "wrapContent"
+       }
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-7-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129257336-vertical-8-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129257336-vertical-8-horizontal-0-if-layout",
+        "type": "ifLayout",
+        "layoutModifier": {
+         "width": "wrapContent",
+         "height": "wrapContent",
+         "size": {
+          "width": "wrapContent",
+          "height": "wrapContent"
+         }
+        },
+        "condition": {
+         "fieldName": "isHelpfulLoading-129257336"
+        },
+        "trueContent": {
+         "__entity": "block",
+         "id": "review-review-list-129257336-vertical-8-horizontal-0-if-layout-true-horizontal",
+         "type": "horizontalLayout",
+         "content": [
+          {
+           "__entity": "block",
+           "id": "review-review-list-129257336-vertical-8-horizontal-0-if-layout-true-horizontal-0-rect",
+           "type": "rectangleAtom",
+           "layoutModifier": {
+            "size": {
+             "width": 120,
+             "height": 20
+            },
+            "background": "surface-secondary",
+            "width": 15,
+            "height": 2.5,
+            "radius": {
+             "topStart": 0.5,
+             "bottomStart": 0.5,
+             "topEnd": 0.5,
+             "bottomEnd": 0.5
+            }
+           }
+          }
+         ],
+         "layoutModifier": {
+          "width": "wrapContent",
+          "height": "wrapContent",
+          "size": {
+           "width": "wrapContent",
+           "height": "wrapContent"
+          }
+         },
+         "verticalAlignment": "center"
+        },
+        "falseContent": {
+         "__entity": "block",
+         "id": "review-review-list-129257336-vertical-8-horizontal-0-if-layout-false-horizontal",
+         "type": "horizontalLayout",
+         "content": [
+          {
+           "__entity": "block",
+           "id": "review-review-list-129257336-vertical-8-horizontal-0-if-layout-false-horizontal-0-text",
+           "type": "textAtom",
+           "layoutModifier": {
+            "width": "wrapContent",
+            "height": "wrapContent",
+            "size": {
+             "width": "wrapContent",
+             "height": "wrapContent"
+            }
+           },
+           "text": "Was this helpful?",
+           "color": "label-secondary",
+           "typography": "caption",
+           "font": "text-regular-xs"
+          },
+          {
+           "__entity": "block",
+           "id": "review-review-list-129257336-vertical-8-horizontal-0-if-layout-false-horizontal-1-rect",
+           "type": "rectangleAtom",
+           "layoutModifier": {
+            "size": {
+             "width": 8,
+             "height": "wrapContent"
+            },
+            "width": 1,
+            "height": "wrapContent"
+           }
+          },
+          {
+           "__entity": "block",
+           "id": "review-review-list-129257336-helpful-btn",
+           "type": "buttonAtom",
+           "layoutModifier": {
+            "width": "wrapContent",
+            "height": "wrapContent",
+            "size": {
+             "width": "wrapContent",
+             "height": "wrapContent"
+            }
+           },
+           "label": "",
+           "variant": "text",
+           "size": "small",
+           "icon": {
+            "icon": "thumbs-up",
+            "position": "leading"
+           },
+           "onClick": {
+            "name": "UPVOTE_REVIEW"
+           }
+          }
+         ],
+         "layoutModifier": {
+          "width": "wrapContent",
+          "height": "wrapContent",
+          "size": {
+           "width": "wrapContent",
+           "height": "wrapContent"
+          }
+         },
+         "verticalAlignment": "center"
+        }
+       }
+      ],
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "className": "paginated-review-card-footer",
+       "width": "fillParent",
+       "height": "wrapContent"
+      },
+      "verticalAlignment": "center"
+     }
+    ],
+    "layoutModifier": {
+     "size": {
+      "width": "fillParent",
+      "height": "wrapContent"
+     },
+     "width": "fillParent",
+     "height": "wrapContent",
+     "padding": {
+      "top": 3,
+      "bottom": 3
+     }
+    },
+    "onImpression": {
+     "name": "CARD_IMPRESSION"
+    }
+   },
+   "contentKey": "activity-review-card"
+  },
+  {
+   "__entity": "block",
+   "id": "review-review-list-129196476",
+   "type": "granular",
+   "controller": {
+    "__entity": "granularBlockController",
+    "type": "composableListController",
+    "controllers": [
+     {
+      "__entity": "granularBlockController",
+      "type": "setStateFieldController",
+      "action": "TOGGLE_EXPAND",
+      "stateField": "isExpanded-129196476",
+      "value": {
+       "type": "notExpression",
+       "operand": {
+        "type": "getStateExpression",
+        "stateField": "isExpanded-129196476"
+       }
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "setStateFieldController",
+      "action": "REQUEST_TRANSLATION",
+      "stateField": "isTranslationLoading-129196476",
+      "value": {
+       "type": "booleanExpression",
+       "value": true
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "interactionConfigurationController",
+      "action": "REQUEST_TRANSLATION",
+      "interactionConfiguration": {
+       "__entity": "interactionConfiguration",
+       "type": "emitEventInteractionConfiguration",
+       "event": {
+        "type": "reviewTranslationRequested",
+        "emitterId": "reloadable-review-card-129196476",
+        "payload": {
+         "reviewId": 129196476,
+         "target": "translated"
+        }
+       }
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "trackingController",
+      "action": "REQUEST_TRANSLATION",
+      "trackingEvent": {
+       "eventName": "TravelerWebReviewTranslateClick",
+       "containerName": "Activity",
+       "properties": {
+        "activity_id": 629577,
+        "review_length": 336,
+        "review_rating": 5,
+        "review_date": "2026-10-28T09:54:51+01:00",
+        "original_language": "de",
+        "target_language": "en",
+        "ui_source": "reviews_section",
+        "producer_properties": {
+         "context": {
+          "owner": "rvw"
+         }
+        }
+       }
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "trackingController",
+      "action": "CARD_IMPRESSION",
+      "trackingEvent": {
+       "eventName": "TravelerWebReviewView",
+       "containerName": "Activity",
+       "properties": {
+        "activity_id": 629577,
+        "review_rating": 5,
+        "review_date": "2026-10-28T09:54:51+01:00",
+        "review_length": 336,
+        "language": "de",
+        "review_id": 129196476,
+        "target": "activity-review-card",
+        "review_rank": 6,
+        "ui_source": "reviews_section",
+        "countryCode": "DE",
+        "traveler_type": "family_old",
+        "ranking_uuid": null,
+        "producer_properties": {
+         "context": {
+          "owner": "rvw"
+         }
+        }
+       }
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "composableListController",
+      "controllers": [
+       {
+        "__entity": "granularBlockController",
+        "type": "setStateFieldController",
+        "action": "UPVOTE_REVIEW",
+        "stateField": "isHelpfulLoading-129196476",
+        "value": {
+         "type": "booleanExpression",
+         "value": true
+        }
+       },
+       {
+        "__entity": "granularBlockController",
+        "type": "interactionConfigurationController",
+        "action": "UPVOTE_REVIEW",
+        "interactionConfiguration": {
+         "__entity": "interactionConfiguration",
+         "type": "composableInteractionConfiguration",
+         "interactionConfigurations": [
+          {
+           "__entity": "interactionConfiguration",
+           "type": "trackingInteractionConfiguration",
+           "trackingEvent": {
+            "eventName": "TravelerWebReviewUpVoteClick",
+            "containerName": "Activity",
+            "properties": {
+             "review_id": 129196476,
+             "ui_source": "reviews_section",
+             "producer_properties": {
+              "context": {
+               "owner": "rvw"
+              }
+             }
+            }
+           }
+          },
+          {
+           "__entity": "interactionConfiguration",
+           "type": "loginModalInteractionConfiguration",
+           "onAction": {
+            "type": "reviewUpvoted",
+            "emitterId": "reloadable-review-card-129196476",
+            "payload": {
+             "reviewId": 129196476
+            }
+           },
+           "title": "Log in to give feedback",
+           "valueProposition": "Please log in or sign up to give feedback on this review."
+          }
+         ]
+        }
+       }
+      ]
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "sduiEventListeningController",
+      "actionToEmit": {
+       "name": "RESET_HELPFUL_LOADING"
+      },
+      "listenerConfigurations": [
+       {
+        "eventType": "loginDismissed"
+       }
+      ]
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "setStateFieldController",
+      "action": "RESET_HELPFUL_LOADING",
+      "stateField": "isHelpfulLoading-129196476",
+      "value": {
+       "type": "booleanExpression",
+       "value": false
+      }
+     },
+     {
+      "__entity": "granularBlockController",
+      "type": "interactionConfigurationController",
+      "action": "OPEN_REVIEW_OPTIONS_MENU",
+      "interactionConfiguration": {
+       "__entity": "interactionConfiguration",
+       "type": "openReviewCardOptionsInteractionConfiguration",
+       "reviewId": 129196476
+      }
+     }
+    ]
+   },
+   "state": {
+    "stateFields": [
+     {
+      "fieldName": "isExpanded-129196476",
+      "type": "boolean",
+      "value": false
+     },
+     {
+      "fieldName": "isTranslationLoading-129196476",
+      "type": "boolean",
+      "value": false
+     },
+     {
+      "fieldName": "isHelpfulLoading-129196476",
+      "type": "boolean",
+      "value": false
+     }
+    ]
+   },
+   "layout": {
+    "__entity": "block",
+    "id": "review-review-list-129196476-vertical",
+    "type": "verticalLayout",
+    "content": [
+     {
+      "__entity": "block",
+      "id": "review-review-list-129196476-vertical-0-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-0-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-1-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-2-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-3-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-4-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-5-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-6-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-7-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-0-horizontal-8-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       }
+      ],
+      "layoutModifier": {
+       "width": "wrapContent",
+       "height": "wrapContent",
+       "size": {
+        "width": "wrapContent",
+        "height": "wrapContent"
+       }
+      },
+      "verticalAlignment": "center"
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129196476-vertical-1-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129196476-vertical-2-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-2-horizontal-0-horizontal",
+        "type": "horizontalLayout",
+        "content": [
+         {
+          "__entity": "block",
+          "id": "review-review-list-129196476-vertical-2-horizontal-0-horizontal-0-z-layout",
+          "type": "zLayout",
+          "content": [
+           {
+            "__entity": "block",
+            "id": "review-review-list-129196476-vertical-2-horizontal-0-horizontal-0-z-layout-0-rect",
+            "type": "rectangleAtom",
+            "layoutModifier": {
+             "size": {
+              "width": 40,
+              "height": 40
+             },
+             "background": "decorative-guiding-red",
+             "width": 5,
+             "height": 5,
+             "radius": {
+              "topStart": "full",
+              "bottomStart": "full",
+              "topEnd": "full",
+              "bottomEnd": "full"
+             }
+            }
+           },
+           {
+            "__entity": "block",
+            "id": "review-review-list-129196476-vertical-2-horizontal-0-horizontal-0-z-layout-1-text",
+            "type": "textAtom",
+            "layoutModifier": {
+             "width": "wrapContent",
+             "height": "wrapContent",
+             "size": {
+              "width": "wrapContent",
+              "height": "wrapContent"
+             }
+            },
+            "text": "T",
+            "color": "label-quaternary",
+            "typography": "title-2",
+            "font": "heading-sm"
+           }
+          ],
+          "layoutModifier": {
+           "size": {
+            "width": 40,
+            "height": 40
+           },
+           "width": 5,
+           "height": 5
+          },
+          "verticalAlignment": "center",
+          "horizontalAlignment": "center"
+         },
+         {
+          "__entity": "block",
+          "id": "review-review-list-129196476-vertical-2-horizontal-0-horizontal-1-vertical",
+          "type": "verticalLayout",
+          "content": [
+           {
+            "__entity": "block",
+            "id": "review-review-list-129196476-vertical-2-horizontal-0-horizontal-1-vertical-0-text",
+            "type": "textAtom",
+            "layoutModifier": {
+             "width": "wrapContent",
+             "height": "wrapContent",
+             "size": {
+              "width": "wrapContent",
+              "height": "wrapContent"
+             }
+            },
+            "text": "Traveler B – Germany",
+            "color": "label-primary",
+            "typography": "caption-strong",
+            "font": "text-medium-xs"
+           },
+           {
+            "__entity": "block",
+            "id": "review-review-list-129196476-vertical-2-horizontal-0-horizontal-1-vertical-1-text",
+            "type": "textAtom",
+            "layoutModifier": {
+             "width": "wrapContent",
+             "height": "wrapContent",
+             "size": {
+              "width": "wrapContent",
+              "height": "wrapContent"
+             }
+            },
+            "text": "October 28, 2026 - Verified booking",
+            "color": "label-secondary",
+            "typography": "caption",
+            "font": "text-regular-xs"
+           }
+          ],
+          "layoutModifier": {
+           "size": {
+            "width": "fillParent",
+            "height": "wrapContent"
+           },
+           "width": "fillParent",
+           "height": "wrapContent",
+           "padding": {
+            "start": 2
+           }
+          }
+         }
+        ],
+        "layoutModifier": {
+         "weight": 1,
+         "width": "wrapContent",
+         "height": "wrapContent",
+         "size": {
+          "width": "wrapContent",
+          "height": "wrapContent"
+         }
+        },
+        "verticalAlignment": "center"
+       },
+       {
+        "__entity": "block",
+        "id": "review-129196476-options-menu",
+        "type": "horizontalLayout",
+        "content": [
+         {
+          "__entity": "block",
+          "id": "review-review-list-129196476-vertical-2-horizontal-1-horizontal-0-icon",
+          "type": "iconAtom",
+          "layoutModifier": {
+           "size": {
+            "width": 36,
+            "height": 36
+           },
+           "width": 4.5,
+           "height": 4.5
+          },
+          "iconName": "dots",
+          "color": "label-primary"
+         }
+        ],
+        "layoutModifier": {
+         "size": {
+          "width": "wrapContent",
+          "height": "wrapContent"
+         },
+         "width": "wrapContent",
+         "height": "wrapContent"
+        },
+        "onClick": {
+         "name": "OPEN_REVIEW_OPTIONS_MENU"
+        }
+       }
+      ],
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "className": "paginated-review-card-author",
+       "width": "fillParent",
+       "height": "wrapContent"
+      },
+      "verticalAlignment": "center"
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129196476-vertical-3-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129196476-vertical-4-if-layout",
+      "type": "ifLayout",
+      "layoutModifier": {
+       "width": "wrapContent",
+       "height": "wrapContent",
+       "size": {
+        "width": "wrapContent",
+        "height": "wrapContent"
+       }
+      },
+      "condition": {
+       "fieldName": "isExpanded-129196476"
+      },
+      "trueContent": {
+       "__entity": "block",
+       "id": "review-review-list-129196476-vertical-4-if-layout-true-vertical",
+       "type": "verticalLayout",
+       "content": [
+        {
+         "__entity": "block",
+         "id": "review-review-list-129196476-vertical-4-if-layout-true-vertical-0-text",
+         "type": "textAtom",
+         "layoutModifier": {
+          "size": {
+           "width": "fillParent",
+           "height": "wrapContent"
+          },
+          "width": "fillParent",
+          "height": "wrapContent"
+         },
+         "text": "Die Tour mit Adrian war fantastisch. Er hat uns mit großer Leidenschaft durch das Marais geführt und uns viele tolle Plätze gezeigt, die wir so nicht gefunden hätten. Auch die Teenager waren fasziniert und hatten Spaß. Adrian hat alles sehr kurzweilig erzählt und man konnte seine Begeisterung für das Viertel spüren. Sehr zu empfehlen!",
+         "color": "label-primary",
+         "typography": "body",
+         "font": "text-regular-sm"
+        }
+       ],
+       "layoutModifier": {
+        "size": {
+         "width": "fillParent",
+         "height": "wrapContent"
+        },
+        "width": "fillParent",
+        "height": "wrapContent"
+       }
+      },
+      "falseContent": {
+       "__entity": "block",
+       "id": "review-review-list-129196476-vertical-4-if-layout-false-vertical",
+       "type": "verticalLayout",
+       "content": [
+        {
+         "__entity": "block",
+         "id": "review-review-list-129196476-vertical-4-if-layout-false-vertical-0-text",
+         "type": "textAtom",
+         "layoutModifier": {
+          "size": {
+           "width": "fillParent",
+           "height": "wrapContent"
+          },
+          "width": "fillParent",
+          "height": "wrapContent"
+         },
+         "text": "Die Tour mit Adrian war fantastisch. Er hat uns mit großer Leidenschaft durch das Marais geführt und uns viele tolle Plätze gezeigt, die wir so nicht gefunden hätten. Auch die Teenager waren fasziniert und hatten Spaß. Adrian hat alles sehr kurzweilig erzählt und man konnte seine Begeisterung für das Viertel spüren. Sehr zu empfehlen!",
+         "color": "label-primary",
+         "typography": "body",
+         "font": "text-regular-sm",
+         "maxLines": 4,
+         "overflow": "ellipsis",
+         "overflowSuffix": {
+          "__entity": "block",
+          "id": "review-review-list-129196476-vertical-4-if-layout-false-vertical-0-styled-text",
+          "type": "styledTextAtom",
+          "layoutModifier": {
+           "className": "c-button--text",
+           "width": "wrapContent",
+           "height": "wrapContent",
+           "size": {
+            "width": "wrapContent",
+            "height": "wrapContent"
+           }
+          },
+          "tokens": [
+           {
+            "text": "Weiterlesen",
+            "className": "c-button__text",
+            "onClick": {
+             "name": "TOGGLE_EXPAND"
+            },
+            "defaultStyle": {
+             "color": "label-secondary",
+             "typography": "body-strong",
+             "font": "text-medium-sm"
+            }
+           }
+          ]
+         }
+        }
+       ],
+       "layoutModifier": {
+        "size": {
+         "width": "fillParent",
+         "height": "wrapContent"
+        },
+        "width": "fillParent",
+        "height": "wrapContent"
+       }
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129196476-vertical-5-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-129196476-vertical-6-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-6-horizontal-0-if-layout",
+        "type": "ifLayout",
+        "layoutModifier": {
+         "width": "wrapContent",
+         "height": "wrapContent",
+         "size": {
+          "width": "wrapContent",
+          "height": "wrapContent"
+         }
+        },
+        "condition": {
+         "fieldName": "isTranslationLoading-129196476"
+        },
+        "trueContent": {
+         "__entity": "block",
+         "id": "review-review-list-129196476-vertical-6-horizontal-0-if-layout-true-horizontal",
+         "type": "horizontalLayout",
+         "content": [
+          {
+           "__entity": "block",
+           "id": "review-review-list-129196476-vertical-6-horizontal-0-if-layout-true-horizontal-0-rect",
+           "type": "rectangleAtom",
+           "layoutModifier": {
+            "size": {
+             "width": 120,
+             "height": 20
+            },
+            "background": "surface-secondary",
+            "width": 15,
+            "height": 2.5,
+            "radius": {
+             "topStart": 0.5,
+             "bottomStart": 0.5,
+             "topEnd": 0.5,
+             "bottomEnd": 0.5
+            }
+           }
+          }
+         ],
+         "layoutModifier": {
+          "width": "wrapContent",
+          "height": "wrapContent",
+          "size": {
+           "width": "wrapContent",
+           "height": "wrapContent"
+          }
+         }
+        },
+        "falseContent": {
+         "__entity": "block",
+         "id": "review-review-list-129196476-vertical-6-horizontal-0-if-layout-false-horizontal",
+         "type": "horizontalLayout",
+         "content": [
+          {
+           "__entity": "block",
+           "id": "translate-review-list-review-129196476",
+           "type": "buttonAtom",
+           "layoutModifier": {
+            "width": "wrapContent",
+            "height": "wrapContent",
+            "size": {
+             "width": "wrapContent",
+             "height": "wrapContent"
+            },
+            "padding": {
+             "top": 0,
+             "bottom": 0,
+             "start": 0,
+             "end": 0
+            }
+           },
+           "label": "Translate",
+           "variant": "text",
+           "size": "small",
+           "color": "standard",
+           "onClick": {
+            "name": "REQUEST_TRANSLATION"
+           }
+          }
+         ],
+         "layoutModifier": {
+          "width": "wrapContent",
+          "height": "wrapContent",
+          "size": {
+           "width": "wrapContent",
+           "height": "wrapContent"
+          }
+         }
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-6-horizontal-1-filler",
+        "type": "fillerAtom",
+        "layoutModifier": {
+         "size": {
+          "width": "wrapContent",
+          "height": "wrapContent"
+         },
+         "width": "wrapContent",
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-129196476-vertical-6-horizontal-2-if-layout",
+        "type": "ifLayout",
+        "layoutModifier": {
+         "width": "wrapContent",
+         "height": "wrapContent",
+         "size": {
+          "width": "wrapContent",
+          "height": "wrapContent"
+         }
+        },
+        "condition": {
+         "fieldName": "isHelpfulLoading-129196476"
+        },
+        "trueContent": {
+         "__entity": "block",
+         "id": "review-review-list-129196476-vertical-6-horizontal-2-if-layout-true-horizontal",
+         "type": "horizontalLayout",
+         "content": [
+          {
+           "__entity": "block",
+           "id": "review-review-list-129196476-vertical-6-horizontal-2-if-layout-true-horizontal-0-rect",
+           "type": "rectangleAtom",
+           "layoutModifier": {
+            "size": {
+             "width": 120,
+             "height": 20
+            },
+            "background": "surface-secondary",
+            "width": 15,
+            "height": 2.5,
+            "radius": {
+             "topStart": 0.5,
+             "bottomStart": 0.5,
+             "topEnd": 0.5,
+             "bottomEnd": 0.5
+            }
+           }
+          }
+         ],
+         "layoutModifier": {
+          "width": "wrapContent",
+          "height": "wrapContent",
+          "size": {
+           "width": "wrapContent",
+           "height": "wrapContent"
+          }
+         },
+         "verticalAlignment": "center"
+        },
+        "falseContent": {
+         "__entity": "block",
+         "id": "review-review-list-129196476-vertical-6-horizontal-2-if-layout-false-horizontal",
+         "type": "horizontalLayout",
+         "content": [
+          {
+           "__entity": "block",
+           "id": "review-review-list-129196476-vertical-6-horizontal-2-if-layout-false-horizontal-0-text",
+           "type": "textAtom",
+           "layoutModifier": {
+            "width": "wrapContent",
+            "height": "wrapContent",
+            "size": {
+             "width": "wrapContent",
+             "height": "wrapContent"
+            }
+           },
+           "text": "Was this helpful?",
+           "color": "label-secondary",
+           "typography": "caption",
+           "font": "text-regular-xs"
+          },
+          {
+           "__entity": "block",
+           "id": "review-review-list-129196476-vertical-6-horizontal-2-if-layout-false-horizontal-1-rect",
+           "type": "rectangleAtom",
+           "layoutModifier": {
+            "size": {
+             "width": 8,
+             "height": "wrapContent"
+            },
+            "width": 1,
+            "height": "wrapContent"
+           }
+          },
+          {
+           "__entity": "block",
+           "id": "review-review-list-129196476-helpful-btn",
+           "type": "buttonAtom",
+           "layoutModifier": {
+            "width": "wrapContent",
+            "height": "wrapContent",
+            "size": {
+             "width": "wrapContent",
+             "height": "wrapContent"
+            }
+           },
+           "label": "",
+           "variant": "text",
+           "size": "small",
+           "icon": {
+            "icon": "thumbs-up",
+            "position": "leading"
+           },
+           "onClick": {
+            "name": "UPVOTE_REVIEW"
+           }
+          }
+         ],
+         "layoutModifier": {
+          "width": "wrapContent",
+          "height": "wrapContent",
+          "size": {
+           "width": "wrapContent",
+           "height": "wrapContent"
+          }
+         },
+         "verticalAlignment": "center"
+        }
+       }
+      ],
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "className": "paginated-review-card-footer",
+       "width": "fillParent",
+       "height": "wrapContent"
+      },
+      "verticalAlignment": "center"
+     }
+    ],
+    "layoutModifier": {
+     "size": {
+      "width": "fillParent",
+      "height": "wrapContent"
+     },
+     "width": "fillParent",
+     "height": "wrapContent",
+     "padding": {
+      "top": 3,
+      "bottom": 3
+     }
+    },
+    "onImpression": {
+     "name": "CARD_IMPRESSION"
+    }
+   },
+   "contentKey": "activity-review-card"
+  },
+  {
+   "__entity": "block",
+   "id": "review-review-list-999000001",
+   "type": "granular",
+   "controller": {
+    "__entity": "granularBlockController",
+    "type": "trackingController",
+    "action": "CARD_IMPRESSION",
+    "trackingEvent": {
+     "eventName": "TravelerWebReviewView",
+     "containerName": "Activity",
+     "properties": {
+      "activity_id": 629577,
+      "review_rating": 4,
+      "review_date": "2026-11-08T08:51:49+01:00",
+      "review_length": 0,
+      "language": "",
+      "review_id": 999000001,
+      "target": "activity-review-card",
+      "review_rank": 0,
+      "ui_source": "reviews_section",
+      "countryCode": "NL",
+      "traveler_type": "family_old",
+      "ranking_uuid": null,
+      "producer_properties": {
+       "context": {
+        "owner": "rvw"
+       }
+      }
+     }
+    }
+   },
+   "layout": {
+    "__entity": "block",
+    "id": "review-review-list-999000001-vertical",
+    "type": "verticalLayout",
+    "content": [
+     {
+      "__entity": "block",
+      "id": "review-review-list-999000001-vertical-0-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-0-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-1-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-2-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-3-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-4-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "decorative-guiding-red"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-5-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-6-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "surface-secondary"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-7-rect",
+        "type": "rectangleAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 2,
+          "height": "wrapContent"
+         },
+         "width": 0.25,
+         "height": "wrapContent"
+        }
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-0-horizontal-8-icon",
+        "type": "iconAtom",
+        "layoutModifier": {
+         "size": {
+          "width": 16,
+          "height": 16
+         },
+         "width": 2,
+         "height": 2
+        },
+        "iconName": "compact-star",
+        "color": "surface-secondary"
+       }
+      ],
+      "layoutModifier": {
+       "width": "wrapContent",
+       "height": "wrapContent",
+       "size": {
+        "width": "wrapContent",
+        "height": "wrapContent"
+       }
+      },
+      "verticalAlignment": "center"
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-999000001-vertical-1-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-999000001-vertical-2-horizontal",
+      "type": "horizontalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-2-horizontal-0-z-layout",
+        "type": "zLayout",
+        "content": [
+         {
+          "__entity": "block",
+          "id": "review-review-list-999000001-vertical-2-horizontal-0-z-layout-0-rect",
+          "type": "rectangleAtom",
+          "layoutModifier": {
+           "size": {
+            "width": 40,
+            "height": 40
+           },
+           "background": "decorative-guiding-red",
+           "width": 5,
+           "height": 5,
+           "radius": {
+            "topStart": "full",
+            "bottomStart": "full",
+            "topEnd": "full",
+            "bottomEnd": "full"
+           }
+          }
+         },
+         {
+          "__entity": "block",
+          "id": "review-review-list-999000001-vertical-2-horizontal-0-z-layout-1-text",
+          "type": "textAtom",
+          "layoutModifier": {
+           "width": "wrapContent",
+           "height": "wrapContent",
+           "size": {
+            "width": "wrapContent",
+            "height": "wrapContent"
+           }
+          },
+          "text": "G",
+          "color": "label-quaternary",
+          "typography": "title-2",
+          "font": "heading-sm"
+         }
+        ],
+        "layoutModifier": {
+         "size": {
+          "width": 40,
+          "height": 40
+         },
+         "width": 5,
+         "height": 5
+        },
+        "verticalAlignment": "center",
+        "horizontalAlignment": "center"
+       },
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-2-horizontal-1-vertical",
+        "type": "verticalLayout",
+        "content": [
+         {
+          "__entity": "block",
+          "id": "review-review-list-999000001-vertical-2-horizontal-1-vertical-0-text",
+          "type": "textAtom",
+          "layoutModifier": {
+           "width": "wrapContent",
+           "height": "wrapContent",
+           "size": {
+            "width": "wrapContent",
+            "height": "wrapContent"
+           }
+          },
+          "text": "GetYourGuide traveler – Netherlands",
+          "color": "label-primary",
+          "typography": "caption-strong",
+          "font": "text-medium-xs"
+         },
+         {
+          "__entity": "block",
+          "id": "review-review-list-999000001-vertical-2-horizontal-1-vertical-1-text",
+          "type": "textAtom",
+          "layoutModifier": {
+           "width": "wrapContent",
+           "height": "wrapContent",
+           "size": {
+            "width": "wrapContent",
+            "height": "wrapContent"
+           }
+          },
+          "text": "November 8, 2026 - Verified booking",
+          "color": "label-secondary",
+          "typography": "caption",
+          "font": "text-regular-xs"
+         }
+        ],
+        "layoutModifier": {
+         "size": {
+          "width": "fillParent",
+          "height": "wrapContent"
+         },
+         "width": "fillParent",
+         "height": "wrapContent",
+         "padding": {
+          "start": 2
+         }
+        }
+       }
+      ],
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "className": "paginated-review-card-author",
+       "width": "fillParent",
+       "height": "wrapContent"
+      },
+      "verticalAlignment": "center"
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-999000001-vertical-3-rect",
+      "type": "rectangleAtom",
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": 16
+       },
+       "width": "fillParent",
+       "height": 2
+      }
+     },
+     {
+      "__entity": "block",
+      "id": "review-review-list-999000001-vertical-4-vertical",
+      "type": "verticalLayout",
+      "content": [
+       {
+        "__entity": "block",
+        "id": "review-review-list-999000001-vertical-4-vertical-0-styled-text",
+        "type": "styledTextAtom",
+        "layoutModifier": {
+         "size": {
+          "width": "fillParent",
+          "height": "wrapContent"
+         },
+         "width": "fillParent",
+         "height": "wrapContent"
+        },
+        "tokens": [
+         {
+          "text": "",
+          "defaultStyle": {
+           "color": "label-primary",
+           "typography": "body",
+           "font": "text-regular-sm"
+          }
+         }
+        ]
+       }
+      ],
+      "layoutModifier": {
+       "size": {
+        "width": "fillParent",
+        "height": "wrapContent"
+       },
+       "width": "fillParent",
+       "height": "wrapContent"
+      }
+     }
+    ],
+    "layoutModifier": {
+     "size": {
+      "width": "fillParent",
+      "height": "wrapContent"
+     },
+     "width": "fillParent",
+     "height": "wrapContent",
+     "padding": {
+      "top": 3,
+      "bottom": 3
+     }
+    },
+    "onImpression": {
+     "name": "CARD_IMPRESSION"
+    }
+   },
+   "contentKey": "activity-review-card"
+  }
+ ]
+}
